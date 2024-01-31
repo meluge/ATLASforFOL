@@ -13,8 +13,20 @@ class LTLLearner(
     private val negativeExamples: List<LassoTrace>,
     private val maxNumOfNode: Int,
     private val excludedOperators: List<String> = emptyList(),
-    private val customConstraints: String = ""
+    private val customConstraints: String = "",
+    private val customAlloyOptions: A4Options? = null
 ) {
+    companion object {
+        fun defaultAlloyOptions(): A4Options {
+            return A4Options().apply {
+                solver = A4Options.SatSolver.SAT4JMax
+                skolemDepth = 1
+                noOverflow = false
+                inferPartialInstance = false
+            }
+        }
+    }
+
     fun generateAlloyModel(): String {
         val binaryOp = listOf("And", "Or", "Imply", "Until").filter { !excludedOperators.contains(it) }
         val unaryOp = listOf("Neg", "F", "G", "X").filter { !excludedOperators.contains(it) }
@@ -177,11 +189,6 @@ class LTLLearner(
     }
 
     private fun alloyOptions(): A4Options {
-        val options = A4Options()
-        options.solver = A4Options.SatSolver.SAT4JMax
-        options.skolemDepth = 1
-        options.noOverflow = false
-        options.inferPartialInstance = false
-        return options
+        return customAlloyOptions ?: defaultAlloyOptions()
     }
 }
