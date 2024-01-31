@@ -38,7 +38,7 @@ fun String.toFluent(): Fluent? {
     }
 }
 
-fun evaluateFluent(word: List<String>, fluents: List<Fluent>): LassoTrace {
+fun evaluateFluent(word: Word, fluents: List<Fluent>): LassoTrace {
     val evaluation = mutableListOf<State>()
 
     // initial state
