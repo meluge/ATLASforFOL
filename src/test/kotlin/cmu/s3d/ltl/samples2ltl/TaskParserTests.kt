@@ -6,17 +6,17 @@ import kotlin.test.assertEquals
 class TaskParserTests {
     @Test
     fun testExample0000() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0000.txt").readText()
+        val content = ClassLoader.getSystemResource("samples2ltl/example0000.trace").readText()
         val task = TaskParser.parseTask(content)
 
-        assertEquals(5, task.numOfPositives)
-        assertEquals(5, task.numOfNegatives)
+        assertEquals(5, task.numOfPositives())
+        assertEquals(5, task.numOfNegatives())
         assertEquals(2, task.depth)
-        assertEquals(2, task.numOfVariables)
-        assertEquals(5, task.maxLengthOfTraces)
+        assertEquals(2, task.numOfVariables())
+        assertEquals(5, task.maxLengthOfTraces())
         assertEquals("G(!(x0))", task.expected)
 
-        val solution = task.learner.learn()
+        val solution = task.buildLearner().learn()
         assert(solution != null)
         assertEquals(
             "G(!(x0))",

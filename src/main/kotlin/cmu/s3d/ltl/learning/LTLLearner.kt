@@ -27,6 +27,10 @@ class LTLLearner(
         }
     }
 
+    init {
+        alloyColdStart()
+    }
+
     fun generateAlloyModel(): String {
         val binaryOp = listOf("And", "Or", "Imply", "Until").filter { !excludedOperators.contains(it) }
         val unaryOp = listOf("Neg", "F", "G", "X").filter { !excludedOperators.contains(it) }
@@ -190,5 +194,13 @@ class LTLLearner(
 
     private fun alloyOptions(): A4Options {
         return customAlloyOptions ?: defaultAlloyOptions()
+    }
+
+    private fun alloyColdStart() {
+        val reporter = A4Reporter.NOP
+        val world = CompUtil.parseEverything_fromString(reporter, "")
+        val options = alloyOptions()
+        val command = world.allCommands.first()
+        TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
     }
 }

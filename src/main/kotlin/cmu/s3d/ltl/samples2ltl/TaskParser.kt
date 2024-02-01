@@ -3,17 +3,48 @@ package cmu.s3d.ltl.samples2ltl
 import cmu.s3d.ltl.LassoTrace
 import cmu.s3d.ltl.State
 import cmu.s3d.ltl.learning.LTLLearner
+import edu.mit.csail.sdg.translator.A4Options
 import kotlin.math.pow
 
 data class Task(
-    val learner: LTLLearner,
-    val numOfPositives: Int,
-    val numOfNegatives: Int,
+    val literals: List<String>,
+    val positiveExamples: List<LassoTrace>,
+    val negativeExamples: List<LassoTrace>,
+    val excludedOperators: List<String>,
     val depth: Int,
-    val numOfVariables: Int,
-    val maxLengthOfTraces: Int,
     val expected: String?
-)
+) {
+    fun buildLearner(options: A4Options? = null): LTLLearner {
+        return LTLLearner(
+            literals = literals,
+            positiveExamples = positiveExamples,
+            negativeExamples = negativeExamples,
+            maxNumOfNode = (2.0).pow(depth).toInt() - 1 + literals.size,
+            excludedOperators = excludedOperators,
+            customAlloyOptions = options
+        )
+    }
+
+    fun numOfPositives(): Int {
+        return positiveExamples.size
+    }
+
+    fun numOfNegatives(): Int {
+        return negativeExamples.size
+    }
+
+    fun numOfVariables(): Int {
+        return literals.size
+    }
+
+    fun maxLengthOfTraces(): Int {
+        return (positiveExamples + negativeExamples).maxOf { it.length() }
+    }
+
+    fun toCSVString(): String {
+        return "${numOfPositives()},${numOfNegatives()},$depth,${numOfVariables()},${maxLengthOfTraces()},$expected"
+    }
+}
 
 object TaskParser {
 
@@ -26,7 +57,7 @@ object TaskParser {
         "|"  to "Or",
         "->" to "Imply",
         "X"  to "X",
-        "props" to "props"
+        "prop" to "prop"
     )
 
     fun parseTask(task: String): Task {
@@ -37,23 +68,12 @@ object TaskParser {
         val depth = parts[3].trim().toInt()
         val expected = if (parts.size > 4) parts[4].trim() else null
 
-        val literals = positives.split(";")[0].split(",").indices.map { "x$it" }
-        val positiveExamples = parseExamples(positives)
-        val negativeExamples = parseExamples(negatives)
-
         return Task(
-            learner = LTLLearner(
-                literals = literals,
-                positiveExamples = positiveExamples,
-                negativeExamples = negativeExamples,
-                maxNumOfNode = (2.0).pow(depth).toInt() - 1 + literals.size,
-                excludedOperators = parseExcludedOperators(operators)
-            ),
-            numOfPositives = positiveExamples.size,
-            numOfNegatives = negativeExamples.size,
+            literals = positives.split(";")[0].split(",").indices.map { "x$it" },
+            positiveExamples = parseExamples(positives),
+            negativeExamples = parseExamples(negatives),
+            excludedOperators = parseExcludedOperators(operators),
             depth = depth,
-            numOfVariables = literals.size,
-            maxLengthOfTraces = (positiveExamples + negativeExamples).maxOf { it.length() },
             expected = expected
         )
     }
