@@ -199,7 +199,7 @@ class LTLLearner(
     private fun alloyColdStart() {
         val reporter = A4Reporter.NOP
         val world = CompUtil.parseEverything_fromString(reporter, "")
-        val options = alloyOptions()
+        val options = alloyOptions().apply { solver = A4Options.SatSolver.SAT4JMax }
         val command = world.allCommands.first()
         TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
     }
