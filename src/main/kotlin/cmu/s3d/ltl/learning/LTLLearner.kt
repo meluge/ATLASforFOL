@@ -22,7 +22,7 @@ class LTLLearner(
                 solver = A4Options.SatSolver.SAT4JMax
                 skolemDepth = 1
                 noOverflow = false
-                inferPartialInstance = false
+                inferPartialInstance = true
             }
         }
     }
@@ -137,12 +137,7 @@ class LTLLearner(
             }
             fun root: one DAGNode { LearnedLTL.Root }
             $customConstraints
-            run {
-                all t: PositiveTrace | root->T0 in t.valuation
-                all t: NegativeTrace | root->T0 not in t.valuation
-                minsome l + r
-            } for $maxNumOfNode DAGNode
-        """.trimIndent()
+        """
 
         return alloyScript
     }
@@ -177,19 +172,37 @@ class LTLLearner(
     }
 
     fun learn(): LTLLearningSolution? {
-        val alloyScript = generateAlloyModel()
-        val reporter = A4Reporter.NOP
-        val world = CompUtil.parseEverything_fromString(reporter, alloyScript)
-        val options = alloyOptions()
-        val command = world.allCommands.first()
-        val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
+        var nodesSeq = (max((maxNumOfNode - literals.size) / 2, 3) + literals.size).. maxNumOfNode step 2
+        if (nodesSeq.isEmpty())
+            nodesSeq = maxNumOfNode..maxNumOfNode
 
-        for (a in solution.allAtoms)
-            world.addGlobal(a.label, a)
-        for (a in solution.allSkolems)
-            world.addGlobal(a.label, a)
+        val alloyTemplate = generateAlloyModel()
+        for (n in nodesSeq) {
+            val alloyScript = """
+            $alloyTemplate
+            run {
+                all t: PositiveTrace | root->T0 in t.valuation
+                all t: NegativeTrace | root->T0 not in t.valuation
+                minsome l + r
+            } for $n DAGNode    
+            """.trimIndent()
 
-        return if (solution.satisfiable()) LTLLearningSolution(world, solution) else null
+            val reporter = A4Reporter.NOP
+            val world = CompUtil.parseEverything_fromString(reporter, alloyScript)
+            val options = alloyOptions()
+            val command = world.allCommands.first()
+            val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
+
+            if (solution.satisfiable()) {
+                for (a in solution.allAtoms)
+                    world.addGlobal(a.label, a)
+                for (a in solution.allSkolems)
+                    world.addGlobal(a.label, a)
+                return LTLLearningSolution(world, solution)
+            }
+        }
+
+        return null
     }
 
     private fun alloyOptions(): A4Options {
@@ -199,7 +212,7 @@ class LTLLearner(
     private fun alloyColdStart() {
         val reporter = A4Reporter.NOP
         val world = CompUtil.parseEverything_fromString(reporter, "")
-        val options = alloyOptions().apply { solver = A4Options.SatSolver.SAT4JMax }
+        val options = defaultAlloyOptions()
         val command = world.allCommands.first()
         TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
     }

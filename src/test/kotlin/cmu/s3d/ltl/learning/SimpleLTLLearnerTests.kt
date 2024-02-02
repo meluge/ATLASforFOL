@@ -154,14 +154,9 @@ class SimpleLTLLearnerTests {
                     Root: DAGNode
                 }
                 fun root: one DAGNode { LearnedLTL.Root }
-
-                run {
-                    all t: PositiveTrace | root->T0 in t.valuation
-                    all t: NegativeTrace | root->T0 not in t.valuation
-                    minsome l + r
-                } for 3 DAGNode
+                
             """.trimIndent(),
-            learner.generateAlloyModel()
+            learner.generateAlloyModel().trimIndent()
         )
 
         val solution = learner.learn()

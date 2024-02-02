@@ -39,7 +39,7 @@ class CLI : CliktCommand(
                 val task = TaskParser.parseTask(f.readText())
                 val learner = task.buildLearner(options)
                 if (model)
-                    println(learner.generateAlloyModel())
+                    println(learner.generateAlloyModel().trimIndent())
                 val startTime = System.currentTimeMillis()
                 val solution = learner.learn()
                 val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
