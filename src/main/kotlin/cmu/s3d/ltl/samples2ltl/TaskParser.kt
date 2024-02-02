@@ -42,7 +42,7 @@ data class Task(
     }
 
     fun toCSVString(): String {
-        return "${numOfPositives()},${numOfNegatives()},$depth,${numOfVariables()},${maxLengthOfTraces()},$expected"
+        return "${numOfPositives()},${numOfNegatives()},$depth,${numOfVariables()},${maxLengthOfTraces()},\"$expected\""
     }
 }
 

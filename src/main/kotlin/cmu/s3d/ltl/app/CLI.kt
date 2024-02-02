@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import edu.mit.csail.sdg.translator.A4Options
 import java.io.File
+import java.nio.file.Paths
 import java.util.*
 
 class CLI : CliktCommand(
@@ -35,16 +36,21 @@ class CLI : CliktCommand(
         if (_run != null) {
             val f = File(_run!!)
             if (f.isFile && f.name.endsWith(".trace")) {
-                println("--- solving ${f.name}")
+//                println("--- solving ${f.name}")
                 val task = TaskParser.parseTask(f.readText())
-                val learner = task.buildLearner(options)
-                if (model)
-                    println(learner.generateAlloyModel().trimIndent())
-                val startTime = System.currentTimeMillis()
-                val solution = learner.learn()
-                val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
-                val formula = solution?.getLTL2() ?: "-"
-                println("${f.name},${task.toCSVString()},$solvingTime,$formula")
+                try {
+                    val learner = task.buildLearner(options)
+                    if (model)
+                        println(learner.generateAlloyModel().trimIndent())
+                    val startTime = System.currentTimeMillis()
+                    val solution = learner.learn()
+                    val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
+                    val formula = solution?.getLTL2() ?: "UNSAT"
+                    println("$_run,${task.toCSVString()},$solvingTime,\"$formula\"")
+                } catch (e: Exception) {
+                    val message = e.message?.replace("\\v".toRegex(), " ") ?: "Unknown error"
+                    println("$_run,${task.toCSVString()},\"ERR:$message\",-")
+                }
             }
             return
         }
@@ -54,22 +60,23 @@ class CLI : CliktCommand(
             return
         }
 
+        println("filename,numOfPositives,numOfNegatives,maxDepth,numOfVariables,maxLengthOfTraces,expected,solvingTime,formula")
         if (filename != null) {
             val f = File(filename!!)
             if (f.isFile && f.name.endsWith(".trace")) {
-                runInSubProcess(f)
+                runInSubProcess(f, filename!!)
             }
         } else if (traces != null) {
             val folder = File(traces!!)
             if (folder.isDirectory) {
                 folder.walk()
                     .filter { it.isFile && it.name.endsWith(".trace") }
-                    .forEach { runInSubProcess(it) }
+                    .forEach { runInSubProcess(it, Paths.get(traces!!, it.absolutePath.substringAfter(traces!!)).toString())  }
             }
         }
     }
 
-    private fun runInSubProcess(f: File) {
+    private fun runInSubProcess(f: File, pathName: String) {
         val cmd = mutableListOf(
             "java",
             "-Djava.library.path=${System.getProperty("java.library.path")}",
@@ -77,7 +84,7 @@ class CLI : CliktCommand(
             System.getProperty("java.class.path"),
             "cmu.s3d.ltl.app.CLIKt",
             "--_run",
-            f.absolutePath,
+            pathName,
             "-s",
             solver,
             "-T",
@@ -92,11 +99,16 @@ class CLI : CliktCommand(
             val timer = Timer(true)
             timer.schedule(object : TimerTask() {
                 override fun run() {
-                    process.destroy()
+                    if (process.isAlive) {
+                        process.destroy()
+
+                        val task = TaskParser.parseTask(f.readText())
+                        println("$pathName,${task.toCSVString()},TO,-")
+                    }
                 }
             }, timeout.toLong() * 1000)
             val output = process.inputStream.bufferedReader().readText()
-            println(output)
+            print(output)
 
             process.waitFor()
             timer.cancel()
