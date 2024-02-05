@@ -163,11 +163,11 @@ class LTLLearner(
         }
 
         return """
-             one sig $name extends $sig {} {
+            one sig $name extends $sig {} {
                 $lasso
                 ${if (trueValues.isNotEmpty()) "${trueValues.joinToString(" + ")} in valuation" else ""}
                 ${if (falseValues.isNotEmpty()) "no (${falseValues.joinToString(" + ")}) & valuation" else ""}
-             }
+            }
         """
     }
 

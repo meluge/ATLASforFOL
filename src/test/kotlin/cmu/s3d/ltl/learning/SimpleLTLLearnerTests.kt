@@ -119,36 +119,36 @@ class SimpleLTLLearnerTests {
                     next = T0->T1 + T1->T2
                 }
 
-                 one sig PT0 extends PositiveTrace {} {
+                one sig PT0 extends PositiveTrace {} {
                     lasso = T2->T0
                     X0->T0 + X1->T0 + X0->T1 + X1->T1 + X1->T2 in valuation
                     no (X0->T2) & valuation
-                 }
+                }
 
-                 one sig PT1 extends PositiveTrace {} {
+                one sig PT1 extends PositiveTrace {} {
                     lasso = T2->T0
                     X1->T0 + X0->T1 + X1->T1 + X1->T2 in valuation
                     no (X0->T0 + X0->T2) & valuation
-                 }
+                }
 
-                 one sig PT2 extends PositiveTrace {} {
+                one sig PT2 extends PositiveTrace {} {
                     lasso = T0->T0
                     X1->T0 in valuation
                     no (X0->T0) & valuation
-                 }
+                }
 
 
-                 one sig NT0 extends NegativeTrace {} {
+                one sig NT0 extends NegativeTrace {} {
                     lasso = T2->T0
                     X1->T2 in valuation
                     no (X0->T0 + X1->T0 + X0->T1 + X1->T1 + X0->T2) & valuation
-                 }
+                }
 
-                 one sig NT1 extends NegativeTrace {} {
+                one sig NT1 extends NegativeTrace {} {
                     lasso = T2->T0
                     X1->T0 + X0->T2 + X1->T2 in valuation
                     no (X0->T0 + X0->T1 + X1->T1) & valuation
-                 }
+                }
 
                 one sig LearnedLTL {
                     Root: DAGNode
