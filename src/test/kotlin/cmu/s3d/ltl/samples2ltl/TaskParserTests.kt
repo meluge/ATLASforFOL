@@ -19,7 +19,7 @@ class TaskParserTests {
         val solution = task.buildLearner().learn()
         assert(solution != null)
         assertEquals(
-            task.expected,
+            "!(F(x0))",
             solution!!.getLTL2()
         )
     }

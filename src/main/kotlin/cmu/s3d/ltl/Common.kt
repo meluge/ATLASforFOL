@@ -14,5 +14,3 @@ data class LassoTrace(
         return prefix + loop
     }
 }
-
-typealias Word = List<String>
