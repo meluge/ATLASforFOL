@@ -6,6 +6,7 @@ import edu.mit.csail.sdg.parser.CompUtil
 import edu.mit.csail.sdg.translator.A4Options
 import edu.mit.csail.sdg.translator.TranslateAlloyToKodkod
 import kotlin.math.max
+import kotlin.math.min
 
 class LTLLearner(
     private val literals: List<String>,
@@ -171,10 +172,11 @@ class LTLLearner(
         """
     }
 
-    fun learn(): LTLLearningSolution? {
-        var nodesSeq = (max((maxNumOfNode - literals.size) / 2, 3) + literals.size).. maxNumOfNode step 2
-        if (nodesSeq.isEmpty())
-            nodesSeq = maxNumOfNode..maxNumOfNode
+    fun learn(start: Int? = null, stepSize: Int = 2): LTLLearningSolution? {
+        val startNum = start ?: min(max((maxNumOfNode - literals.size) / 2, 3), 6)
+        val nodesSeq = (startNum.. maxNumOfNode step stepSize).toMutableList()
+        if (nodesSeq.isEmpty() || nodesSeq.last() < maxNumOfNode)
+            nodesSeq.add(maxNumOfNode)
 
         val alloyTemplate = generateAlloyModel()
         for (n in nodesSeq) {
