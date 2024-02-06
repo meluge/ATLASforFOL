@@ -1,0 +1,76 @@
+## Install
+Download the latest release of LTL-Learning.jar from the *Releases* page.
+
+The program requires Java >= 8 to run.
+
+**Note:**
+The tool requires AlloyMax to run. AlloyMax will copy some util modules and solvers to a temp directory. So in order for the tool to run correctly, I suggest clone the repo to your local machine and manually start AlloyMax for the first time.
+```
+git clone <the repo name>
+cd LTL-Learning
+java -jar lib/AlloyMax-1.0.3.jar
+```
+Click the *Execute* button on the GUI. It should find an instance, which indicates that Alloy can successfully run on your machine. Then, you can close the AlloyMax GUI.
+
+## Task file
+We use the problem format from [samples2LTL](https://github.com/ivan-gavran/samples2LTL) to define a problem. The file looks like:
+```
+0,0;0,1;0,1;0,0;0,0::0
+0,1;0,1;0,1;0,1;0,1::4
+0,0;0,1;0,1;0,1;0,1::3
+0,1;0,1;0,0;0,1;0,1::4
+0,0;0,0;0,0;0,1;0,0::2
+---
+1,0;1,1;1,0;1,1;0,0::1
+0,0;1,1;1,0;0,1;0,1::0
+1,0;1,0;0,1;0,1;0,1::3
+0,1;0,0;0,1;1,0;0,1::2
+1,0;0,1;1,0;1,0;1,1::3
+---
+G,F,!,U,&,|,->,X
+---
+2
+---
+G(!(x0))
+```
+The first part is the positive traces. Each trace is a sequence of states. Each state is a sequence of atom values `0,0` separated by `,`. States in a trace is separated by `;`. The last `::` indicates after the last state of the trace, where it would go back to for the infinite loop in a lasso trace.
+
+For example: `0,0;0,0;0,0;0,1;0,0::2` means there are 5 states in the trace, and after the last state, it will go back to the trace with index 2. The index starts from 0.
+
+The second part is the negative traces. The third part is the operators to allow in the learned formula. In total, we allow `&, |, ->, !, X, G, F, U`.
+
+The next part is a number that indicates the depth of the syntax tree. However, we are actually using a DAG to model the syntax. So we need the max number of nodes in the graph. For simplicity, we compute the max number of nodes as `2^depth - 1`. So in practice, set the depth to be less or equal to 4, which will allow a maximum of 15 subformulas in the learned LTL.
+
+The final part is the expected formula. However, this is optional.
+
+## Run
+The usage of LTL-Learning is:
+```
+Usage: LTL-Learning [OPTIONS]
+
+  A tool to learn LTL formulas from a set of positive and negative examples by
+  using AlloyMax.
+
+Options:
+  --_run TEXT          Run the learning process. YOU SHOULD NOT USE THIS. INTERNAL USE ONLY.
+  -s, --solver TEXT    The AlloyMax solver to use.
+  -f, --filename TEXT  The file containing one task to run.
+  -t, --traces TEXT    The folder containing the tasks to run. It will find all task files under the folder recursively.
+  -T, --timeout TEXT   The timeout in seconds for solving each task.
+  -m, --model          Print the model to use for learning.
+  -h, --help           Show this message and exit
+```
+
+For example, to run a particular task file, you can do:
+```
+cd LTL-Learning
+java -Djava.library.path=./lib/open-wbo -cp LTL-Learning.jar cmu.s3d.ltl.app.CLIKt -f <the trace file> -s OpenWBOWeighted -T 60
+```
+In this example, we use `-Djava.library.path=./lib/open-wbo` to add the open-wbo MaxSAT Solver by Ruben Martins to the path, and we use `OpenWBOWeighted` as the solving algorithm. This is recommended because it is the fastest one from our benchmark.
+
+The result of the above example task file should look like:
+```
+<trace file path>,5,5,2,2,5,"G(!(x0))",0.495,"!(F(x0))"
+```
+
+**Note:** The learned LTL might be different from the expected one for two reasons: (1) they are actually equal like "G(!x0) <=> !F(x0)"; (2) there exists a smaller LTL formula satisfying the examples traces.
