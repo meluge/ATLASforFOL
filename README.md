@@ -64,7 +64,7 @@ Options:
 For example, to run a particular task file, you can do:
 ```
 cd LTL-Learning
-java -Djava.library.path=./lib/open-wbo -cp LTL-Learning.jar cmu.s3d.ltl.app.CLIKt -f <the trace file> -s OpenWBOWeighted -T 60
+java -Djava.library.path=./lib -cp LTL-Learning.jar cmu.s3d.ltl.app.CLIKt -f <the trace file> -s OpenWBOWeighted -T 60
 ```
 In this example, we use `-Djava.library.path=./lib/open-wbo` to add the open-wbo MaxSAT Solver by Ruben Martins to the path, and we use `OpenWBOWeighted` as the solving algorithm. This is recommended because it is the fastest one from our benchmark.
 
