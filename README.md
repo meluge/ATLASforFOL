@@ -1,5 +1,5 @@
 ## Install
-Download the latest release of LTL-Learning.jar from the *Releases* page.
+Download the latest release of LTL-Learning.jar from the *[Releases](https://github.com/SteveZhangBit/LTL-Learning/releases)* page.
 
 The program requires Java >= 8 to run.
 
@@ -61,7 +61,7 @@ Options:
   -h, --help           Show this message and exit
 ```
 
-For example, to run a particular task file, you can do:
+For example, to run a particular task file. Note that, the task file should be ending with `.trace`. Then, you can do:
 ```
 cd LTL-Learning
 java -Djava.library.path=./lib -cp LTL-Learning.jar cmu.s3d.ltl.app.CLIKt -f <the trace file> -s OpenWBOWeighted -T 60
