@@ -138,7 +138,12 @@ class LTLLearner(
             }
             fun root: one DAGNode { LearnedLTL.Root }
             $customConstraints
-        """
+            run {
+                all t: PositiveTrace | root->T0 in t.valuation
+                all t: NegativeTrace | root->T0 not in t.valuation
+                minsome l + r
+            } for %d DAGNode
+        """.trimIndent()
 
         return alloyScript
     }
@@ -180,14 +185,7 @@ class LTLLearner(
 
         val alloyTemplate = generateAlloyModel()
         for (n in nodesSeq) {
-            val alloyScript = """
-            $alloyTemplate
-            run {
-                all t: PositiveTrace | root->T0 in t.valuation
-                all t: NegativeTrace | root->T0 not in t.valuation
-                minsome l + r
-            } for $n DAGNode    
-            """.trimIndent()
+            val alloyScript = String.format(alloyTemplate, n)
 
             val reporter = A4Reporter.NOP
             val world = CompUtil.parseEverything_fromString(reporter, alloyScript)
