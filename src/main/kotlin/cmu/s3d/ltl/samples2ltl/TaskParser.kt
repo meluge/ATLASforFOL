@@ -12,7 +12,8 @@ data class Task(
     val negativeExamples: List<LassoTrace>,
     val excludedOperators: List<String>,
     val depth: Int,
-    val expected: String?
+    val expected: String?,
+    val customConstraints: String?
 ) {
     fun buildLearner(options: A4Options? = null): LTLLearner {
         return LTLLearner(
@@ -21,7 +22,8 @@ data class Task(
             negativeExamples = negativeExamples,
             maxNumOfNode = (2.0).pow(depth).toInt() - 1 + literals.size,
             excludedOperators = excludedOperators,
-            customAlloyOptions = options
+            customAlloyOptions = options,
+            customConstraints = customConstraints?.let { "\n${it.prependIndent("            ")}\n" } ?: ""
         )
     }
 
@@ -67,6 +69,7 @@ object TaskParser {
         val operators = parts[2].trim()
         val depth = parts[3].trim().toInt()
         val expected = if (parts.size > 4) parts[4].trim() else null
+        val constraints = if (parts.size > 5) parts[5].trim() else null
 
         return Task(
             literals = positives.split(";")[0].split(",").indices.map { "x$it" },
@@ -74,7 +77,8 @@ object TaskParser {
             negativeExamples = parseExamples(negatives),
             excludedOperators = parseExcludedOperators(operators),
             depth = depth,
-            expected = expected
+            expected = expected,
+            customConstraints = constraints
         )
     }
 
