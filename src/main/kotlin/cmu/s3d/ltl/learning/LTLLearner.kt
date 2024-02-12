@@ -15,23 +15,8 @@ class LTLLearner(
     private val maxNumOfNode: Int,
     private val excludedOperators: List<String> = emptyList(),
     private val customConstraints: String = "",
-    private val customAlloyOptions: A4Options? = null
-) {
-    companion object {
-        fun defaultAlloyOptions(): A4Options {
-            return A4Options().apply {
-                solver = A4Options.SatSolver.SAT4JMax
-                skolemDepth = 1
-                noOverflow = false
-                inferPartialInstance = true
-            }
-        }
-    }
-
-    init {
-        alloyColdStart()
-    }
-
+    customAlloyOptions: A4Options? = null
+) : AlloyMaxBase(customAlloyOptions) {
     fun generateAlloyModel(): String {
         val binaryOp = listOf("And", "Or", "Imply", "Until").filter { !excludedOperators.contains(it) }
         val unaryOp = listOf("Neg", "F", "G", "X").filter { !excludedOperators.contains(it) }
@@ -205,15 +190,5 @@ class LTLLearner(
         return null
     }
 
-    private fun alloyOptions(): A4Options {
-        return customAlloyOptions ?: defaultAlloyOptions()
-    }
 
-    private fun alloyColdStart() {
-        val reporter = A4Reporter.NOP
-        val world = CompUtil.parseEverything_fromString(reporter, "")
-        val options = defaultAlloyOptions()
-        val command = world.allCommands.first()
-        TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
-    }
 }

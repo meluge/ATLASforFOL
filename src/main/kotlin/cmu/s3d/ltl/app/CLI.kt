@@ -1,6 +1,6 @@
 package cmu.s3d.ltl.app
 
-import cmu.s3d.ltl.learning.LTLLearner
+import cmu.s3d.ltl.learning.AlloyMaxBase
 import cmu.s3d.ltl.samples2ltl.TaskParser
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
@@ -23,7 +23,7 @@ class CLI : CliktCommand(
     private val model by option("--model", "-m", help = "The model to use for learning.").flag(default = false)
 
     override fun run() {
-        val options = LTLLearner.defaultAlloyOptions()
+        val options = AlloyMaxBase.defaultAlloyOptions()
         options.solver = when (solver) {
             "SAT4JMax" -> A4Options.SatSolver.SAT4JMax
             "OpenWBO" -> A4Options.SatSolver.OpenWBO
