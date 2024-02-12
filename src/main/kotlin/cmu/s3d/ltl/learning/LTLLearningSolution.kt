@@ -7,7 +7,7 @@ import edu.mit.csail.sdg.translator.A4TupleSet
 
 class LTLLearningSolution(private val world: CompModule, private val alloySolution: A4Solution) {
 
-    private data class Node(val name: String, val left: String?, val right: String?)
+    data class Node(val name: String, val left: String?, val right: String?)
 
     private val operatorMapping = mapOf(
         "G"  to "G",
@@ -50,7 +50,7 @@ class LTLLearningSolution(private val world: CompModule, private val alloySoluti
         }
     }
 
-    private fun getNodeAndChildren(node: String): Node {
+    fun getNodeAndChildren(node: String): Node {
         val name = node.split('$')[0]
         val leftExpr = CompUtil.parseOneExpression_fromString(world, "$node.l")
         val leftNode = (alloySolution.eval(leftExpr) as A4TupleSet).map { it.atom(0) }.firstOrNull()
@@ -59,7 +59,7 @@ class LTLLearningSolution(private val world: CompModule, private val alloySoluti
         return Node(name, leftNode, rightNode)
     }
 
-    private fun getRoot(): String {
+    fun getRoot(): String {
         val expr = CompUtil.parseOneExpression_fromString(world, "root")
         return (alloySolution.eval(expr) as A4TupleSet).map { it.atom(0) }.first()
     }
