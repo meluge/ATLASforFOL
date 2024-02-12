@@ -15,12 +15,12 @@ class CLI : CliktCommand(
     name = "LTL-Learning",
     help = "A tool to learn LTL formulas from a set of positive and negative examples by using AlloyMax."
 ) {
-    private val _run by option("--_run", help = "Run the learning process.")
-    private val solver by option("--solver", "-s", help = "The AlloyMax solver to use.").default("SAT4JMax")
+    private val _run by option("--_run", help = "Run the learning process. YOU SHOULD NOT USE THIS. INTERNAL USE ONLY.")
+    private val solver by option("--solver", "-s", help = "The AlloyMax solver to use. Default: SAT4JMax").default("SAT4JMax")
     private val filename by option("--filename", "-f", help = "The file containing one task to run.")
-    private val traces by option("--traces", "-t", help = "The folder containing the tasks to run.")
+    private val traces by option("--traces", "-t", help = "The folder containing the tasks to run. It will find all task files under the folder recursively.")
     private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").default("5")
-    private val model by option("--model", "-m", help = "The model to use for learning.").flag(default = false)
+    private val model by option("--model", "-m", help = "Print the model to use for learning.").flag(default = false)
 
     override fun run() {
         val options = AlloyMaxBase.defaultAlloyOptions()
