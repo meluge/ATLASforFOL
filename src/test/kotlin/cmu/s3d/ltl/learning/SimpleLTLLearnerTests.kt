@@ -154,6 +154,11 @@ class SimpleLTLLearnerTests {
                     Root: DAGNode
                 }
                 fun root: one DAGNode { LearnedLTL.Root }
+                fun childrenOf[n: DAGNode]: set DAGNode { n.^(l+r) }
+                fun childrenAndSelfOf[n: DAGNode]: set DAGNode { n.*(l+r) }
+                fun ancestorsOf[n: DAGNode]: set DAGNode { n.~^(l+r) }
+                fun ancestorsAndSelfOf[n: DAGNode]: set DAGNode { n.~*(l+r) }
+                fun subDAG[n: DAGNode]: DAGNode -> DAGNode { (l+r) :> n.^(l+r) }
                 
                 run {
                     all t: PositiveTrace | root->T0 in t.valuation
