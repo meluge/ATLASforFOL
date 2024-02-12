@@ -14,3 +14,5 @@ data class LassoTrace(
         return prefix + loop
     }
 }
+
+typealias FiniteTrace = List<State>
