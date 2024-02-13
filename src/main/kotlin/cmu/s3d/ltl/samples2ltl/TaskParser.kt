@@ -71,10 +71,19 @@ object TaskParser {
         val expected = if (parts.size > 4) parts[4].trim() else null
         val constraints = if (parts.size > 5) parts[5].trim() else null
 
+        val positiveExamples = parseExamples(positives)
+        val negativeExamples = parseExamples(negatives)
+        val numOfLiterals = let {
+            if (positiveExamples.isEmpty())
+                negativeExamples.first()
+            else
+                positiveExamples.first()
+        }.getStateAt(0).values.size
+        val literals = (0 until numOfLiterals).map { "x$it" }
         return Task(
-            literals = positives.split(";")[0].split(",").indices.map { "x$it" },
-            positiveExamples = parseExamples(positives),
-            negativeExamples = parseExamples(negatives),
+            literals = literals,
+            positiveExamples = positiveExamples,
+            negativeExamples = negativeExamples,
             excludedOperators = parseExcludedOperators(operators),
             depth = depth,
             expected = expected,
@@ -83,13 +92,16 @@ object TaskParser {
     }
 
     private fun parseExamples(examples: String): List<LassoTrace> {
-        return examples.lines().map {
-            val line = it.trim()
-            val parts = line.split("::")
-            val trace = parseTrace(parts[0])
-            val lasso = parts[1].toInt()
-            LassoTrace(prefix = trace.subList(0, lasso), loop = trace.subList(lasso, trace.size))
-        }
+        return if (examples.isBlank())
+            emptyList()
+        else
+            examples.lines().map {
+                val line = it.trim()
+                val parts = line.split("::")
+                val trace = parseTrace(parts[0])
+                val lasso = if (parts.size == 1 || parts[1].isBlank()) 0 else parts[1].toInt()
+                LassoTrace(prefix = trace.subList(0, lasso), loop = trace.subList(lasso, trace.size))
+            }
     }
 
     private fun parseExcludedOperators(operators: String): List<String> {

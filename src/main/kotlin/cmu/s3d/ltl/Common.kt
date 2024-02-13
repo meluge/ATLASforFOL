@@ -13,6 +13,14 @@ data class LassoTrace(
     fun getTrace(): List<State> {
         return prefix + loop
     }
+
+    fun getStateAt(i: Int): State {
+        return if (i < prefix.size) {
+            prefix[i]
+        } else {
+            loop[i - prefix.size]
+        }
+    }
 }
 
 typealias FiniteTrace = List<State>

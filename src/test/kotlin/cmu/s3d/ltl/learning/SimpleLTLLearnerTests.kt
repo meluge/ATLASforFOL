@@ -109,9 +109,8 @@ class SimpleLTLLearnerTests {
                 fun futureIdx[t: Trace, i: SeqIdx]: set SeqIdx {
                 	i.^((next :> seqRange[t]) + t.lasso) + i
                 }
-
-                abstract sig PositiveTrace, NegativeTrace extends Trace {}
-
+                abstract sig PositiveTrace extends Trace {}
+                abstract sig NegativeTrace extends Trace {}
                 one sig X0, X1 extends Literal {}
                 one sig T0, T1, T2 extends SeqIdx {}
                 fact {

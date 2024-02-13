@@ -107,9 +107,8 @@ class LTLLearner(
             fun futureIdx[t: Trace, i: SeqIdx]: set SeqIdx {
             	i.^((next :> seqRange[t]) + t.lasso) + i
             }
-
-            abstract sig PositiveTrace, NegativeTrace extends Trace {}
-            
+            ${if (positiveTraces.isNotEmpty()) "abstract sig PositiveTrace extends Trace {}" else ""}
+            ${if (negativeTraces.isNotEmpty()) "abstract sig NegativeTrace extends Trace {}" else ""}
             one sig ${literals.joinToString(", ")} extends Literal {}
             one sig ${(0 until maxExampleLength).joinToString(", ") { "T${it}" }} extends SeqIdx {}
             fact {
@@ -129,8 +128,8 @@ class LTLLearner(
             fun subDAG[n: DAGNode]: DAGNode -> DAGNode { (l+r) :> n.^(l+r) }
             $customConstraints
             run {
-                all t: PositiveTrace | root->T0 in t.valuation
-                all t: NegativeTrace | root->T0 not in t.valuation
+                ${if (positiveTraces.isNotEmpty()) "all t: PositiveTrace | root->T0 in t.valuation" else ""}
+                ${if (negativeTraces.isNotEmpty()) "all t: NegativeTrace | root->T0 not in t.valuation" else ""}
                 minsome l + r
             } for %d DAGNode
         """.trimIndent()
