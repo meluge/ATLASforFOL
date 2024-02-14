@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import edu.mit.csail.sdg.translator.A4Options
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.nio.file.Paths
 import java.util.*
 
@@ -77,8 +78,14 @@ class CLI : CliktCommand(
     }
 
     private fun runInSubProcess(f: File, pathName: String) {
+        val jvmArgs = ManagementFactory.getRuntimeMXBean().inputArguments
+        val jvmXms = jvmArgs.find { it.startsWith("-Xms") }
+        val jvmXmx = jvmArgs.find { it.startsWith("-Xmx") }
+
         val cmd = mutableListOf(
             "java",
+            jvmXms ?: "-Xms512m",
+            jvmXmx ?: "-Xmx4g",
             "-Djava.library.path=${System.getProperty("java.library.path")}",
             "-cp",
             System.getProperty("java.class.path"),
