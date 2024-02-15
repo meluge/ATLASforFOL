@@ -99,7 +99,12 @@ object TaskParser {
                 val line = it.trim()
                 val parts = line.split("::")
                 val trace = parseTrace(parts[0])
-                val lasso = if (parts.size == 1 || parts[1].isBlank()) 0 else parts[1].toInt()
+                val lasso = if (parts.size == 1 || parts[1].isBlank())
+                    0
+                else if (parts[1][0] == '[')
+                    parts[1].substring(1, parts[1].length-1).toInt()
+                else
+                    parts[1].toInt()
                 LassoTrace(prefix = trace.subList(0, lasso), loop = trace.subList(lasso, trace.size))
             }
     }

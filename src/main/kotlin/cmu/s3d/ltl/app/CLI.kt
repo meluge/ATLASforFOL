@@ -66,6 +66,8 @@ class CLI : CliktCommand(
             val f = File(filename!!)
             if (f.isFile && f.name.endsWith(".trace")) {
                 runInSubProcess(f, filename!!)
+            } else {
+                error("The file $filename does not exist or is not a .trace file.")
             }
         } else if (traces != null) {
             val folder = File(traces!!)
@@ -100,6 +102,7 @@ class CLI : CliktCommand(
         if (model)
             cmd.add("-m")
         val processBuilder = ProcessBuilder(cmd)
+        processBuilder.redirectErrorStream(true)
         val process = processBuilder.start()
 
         try {
