@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.int
 import edu.mit.csail.sdg.translator.A4Options
 import java.io.File
 import java.lang.management.ManagementFactory
@@ -20,7 +21,7 @@ class CLI : CliktCommand(
     private val solver by option("--solver", "-s", help = "The AlloyMax solver to use. Default: SAT4JMax").default("SAT4JMax")
     private val filename by option("--filename", "-f", help = "The file containing one task to run.")
     private val traces by option("--traces", "-t", help = "The folder containing the tasks to run. It will find all task files under the folder recursively.")
-    private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").default("5")
+    private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").int().default(0)
     private val model by option("--model", "-m", help = "Print the model to use for learning.").flag(default = false)
 
     override fun run() {
@@ -97,7 +98,7 @@ class CLI : CliktCommand(
             "-s",
             solver,
             "-T",
-            timeout,
+            timeout.toString(),
         )
         if (model)
             cmd.add("-m")
@@ -107,16 +108,18 @@ class CLI : CliktCommand(
 
         try {
             val timer = Timer(true)
-            timer.schedule(object : TimerTask() {
-                override fun run() {
-                    if (process.isAlive) {
-                        process.destroy()
+            if (timeout > 0) {
+                timer.schedule(object : TimerTask() {
+                    override fun run() {
+                        if (process.isAlive) {
+                            process.destroy()
 
-                        val task = TaskParser.parseTask(f.readText())
-                        println("$pathName,${task.toCSVString()},TO,-")
+                            val task = TaskParser.parseTask(f.readText())
+                            println("$pathName,${task.toCSVString()},TO,-")
+                        }
                     }
-                }
-            }, timeout.toLong() * 1000)
+                }, timeout.toLong() * 1000)
+            }
             val output = process.inputStream.bufferedReader().readText()
             print(output)
 
