@@ -62,7 +62,7 @@ class CLI : CliktCommand(
             return
         }
 
-        println("filename,numOfPositives,numOfNegatives,maxDepth,numOfVariables,maxLengthOfTraces,expected,solvingTime,formula")
+        println("filename,numOfPositives,numOfNegatives,maxNumOfOP,numOfVariables,maxLengthOfTraces,expected,solvingTime,formula")
         if (filename != null) {
             val f = File(filename!!)
             if (f.isFile && f.name.endsWith(".trace")) {

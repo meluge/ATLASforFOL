@@ -11,7 +11,7 @@ data class Task(
     val positiveExamples: List<LassoTrace>,
     val negativeExamples: List<LassoTrace>,
     val excludedOperators: List<String>,
-    val depth: Int,
+    val maxNumOfOP: Int,
     val expected: String?,
     val customConstraints: String?
 ) {
@@ -20,7 +20,7 @@ data class Task(
             literals = literals,
             positiveExamples = positiveExamples,
             negativeExamples = negativeExamples,
-            maxNumOfNode = (2.0).pow(depth).toInt() - 1 + literals.size,
+            maxNumOfNode = maxNumOfOP + literals.size,
             excludedOperators = excludedOperators,
             customAlloyOptions = options,
             customConstraints = customConstraints?.let { "\n${it.prependIndent("            ")}\n" } ?: ""
@@ -44,7 +44,7 @@ data class Task(
     }
 
     fun toCSVString(): String {
-        return "${numOfPositives()},${numOfNegatives()},$depth,${numOfVariables()},${maxLengthOfTraces()},\"$expected\""
+        return "${numOfPositives()},${numOfNegatives()},$maxNumOfOP,${numOfVariables()},${maxLengthOfTraces()},\"$expected\""
     }
 }
 
@@ -67,7 +67,15 @@ object TaskParser {
         val positives = parts[0].trim()
         val negatives = parts[1].trim()
         val operators = parts[2].trim()
-        val depth = parts[3].trim().toInt()
+        val maxNumOfOP = parts[3].trim().let {
+            if (it[0] == '[') {
+                // For historical reasons, when it starts with [, it means the max number of node
+                it.substring(1, it.length - 1).toInt()
+            } else {
+                // otherwise, it is the depth
+                (2.0).pow(it.toInt()) - 1
+            }
+        }.toInt()
         val expected = if (parts.size > 4) parts[4].trim() else null
         val constraints = if (parts.size > 5) parts[5].trim() else null
 
@@ -85,7 +93,7 @@ object TaskParser {
             positiveExamples = positiveExamples,
             negativeExamples = negativeExamples,
             excludedOperators = parseExcludedOperators(operators),
-            depth = depth,
+            maxNumOfOP = maxNumOfOP,
             expected = expected,
             customConstraints = constraints
         )
