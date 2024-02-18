@@ -23,6 +23,7 @@ class CLI : CliktCommand(
     private val traces by option("--traces", "-t", help = "The folder containing the tasks to run. It will find all task files under the folder recursively.")
     private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").int().default(0)
     private val model by option("--model", "-m", help = "Print the model to use for learning.").flag(default = false)
+    private val findAny by option("--findAny", "-A", help = "Find any solution. Default: false").flag(default = false)
 
     override fun run() {
         val options = AlloyMaxBase.defaultAlloyOptions()
@@ -32,6 +33,8 @@ class CLI : CliktCommand(
             "OpenWBOWeighted" -> A4Options.SatSolver.OpenWBOWeighted
             "POpenWBO" -> A4Options.SatSolver.POpenWBO
             "POpenWBOAuto" -> A4Options.SatSolver.POpenWBOAuto
+            "SAT4J" -> A4Options.SatSolver.SAT4J
+            "MiniSat" -> A4Options.SatSolver.MiniSatJNI
             else -> throw IllegalArgumentException("Unknown solver: $solver")
         }
 
@@ -41,7 +44,7 @@ class CLI : CliktCommand(
 //                println("--- solving ${f.name}")
                 val task = TaskParser.parseTask(f.readText())
                 try {
-                    val learner = task.buildLearner(options)
+                    val learner = task.buildLearner(options, !findAny)
                     if (model)
                         println(learner.generateAlloyModel().trimIndent())
                     val startTime = System.currentTimeMillis()
@@ -97,11 +100,10 @@ class CLI : CliktCommand(
             pathName,
             "-s",
             solver,
-            "-T",
-            timeout.toString(),
         )
-        if (model)
-            cmd.add("-m")
+        if (model) cmd.add("-m")
+        if (findAny) cmd.add("-A")
+
         val processBuilder = ProcessBuilder(cmd)
         processBuilder.redirectErrorStream(true)
         val process = processBuilder.start()

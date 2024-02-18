@@ -15,7 +15,7 @@ data class Task(
     val expected: String?,
     val customConstraints: String?
 ) {
-    fun buildLearner(options: A4Options? = null): LTLLearner {
+    fun buildLearner(options: A4Options? = null, minimized: Boolean = true): LTLLearner {
         return LTLLearner(
             literals = literals,
             positiveExamples = positiveExamples,
@@ -23,7 +23,8 @@ data class Task(
             maxNumOfNode = maxNumOfOP + literals.size,
             excludedOperators = excludedOperators,
             customAlloyOptions = options,
-            customConstraints = customConstraints?.let { "\n${it.prependIndent("            ")}\n" } ?: ""
+            customConstraints = customConstraints?.let { "\n${it.prependIndent("            ")}\n" } ?: "",
+            minimized = minimized
         )
     }
 

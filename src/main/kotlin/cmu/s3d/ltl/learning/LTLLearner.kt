@@ -15,7 +15,8 @@ class LTLLearner(
     private val maxNumOfNode: Int,
     private val excludedOperators: List<String> = emptyList(),
     private val customConstraints: String = "",
-    customAlloyOptions: A4Options? = null
+    customAlloyOptions: A4Options? = null,
+    private val minimized: Boolean = true,
 ) : AlloyMaxBase(customAlloyOptions) {
     fun generateAlloyModel(): String {
         val binaryOp = listOf("And", "Or", "Imply", "Until").filter { !excludedOperators.contains(it) }
@@ -130,7 +131,7 @@ class LTLLearner(
             run {
                 ${if (positiveTraces.isNotEmpty()) "all t: PositiveTrace | root->T0 in t.valuation" else ""}
                 ${if (negativeTraces.isNotEmpty()) "all t: NegativeTrace | root->T0 not in t.valuation" else ""}
-                minsome l + r
+                ${if (minimized) "minsome l + r" else ""}
             } for %d DAGNode
         """.trimIndent()
 
