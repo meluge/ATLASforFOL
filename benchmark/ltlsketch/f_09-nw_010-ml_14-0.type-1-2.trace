@@ -26,4 +26,5 @@ G,F,!,U,&,|,->,X
 ---
 G(->(x1,G(x0)))
 ---
-fact { root in (Neg + F + G + X) and root.l in Imply and root.l.l in x1 and root.l.r in (Neg + F + G + X) and root.l.r.l in x0 }
+one sig Imply0 extends Imply {}
+fact { root in (Neg + F + G + X) and root.l = Imply0 and root.l.l = x1 and root.l.r in (Neg + F + G + X) and root.l.r.l = x0 }

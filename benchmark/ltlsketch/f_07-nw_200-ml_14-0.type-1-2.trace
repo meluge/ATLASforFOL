@@ -406,4 +406,5 @@ G,F,!,U,&,|,->,X
 ---
 G(x0)
 ---
-fact { root in (Neg + F + G + X) and root.l in x0 }
+
+fact { root in (Neg + F + G + X) and root.l = x0 }

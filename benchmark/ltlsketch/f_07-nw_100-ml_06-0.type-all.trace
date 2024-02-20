@@ -206,4 +206,5 @@ G,F,!,U,&,|,->,X
 ---
 G(x0)
 ---
+
 fact { root in (Neg + F + G + X) }

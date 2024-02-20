@@ -26,4 +26,5 @@ G,F,!,U,&,|,->,X
 ---
 F(x0)
 ---
-fact { root in (Neg + F + G + X) and root.l in x0 }
+
+fact { root in (Neg + F + G + X) and root.l = x0 }

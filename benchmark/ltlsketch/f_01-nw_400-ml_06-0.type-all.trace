@@ -806,4 +806,5 @@ G,F,!,U,&,|,->,X
 ---
 G(!(x0))
 ---
-fact { root in (Neg + F + G + X) and root.l in Neg }
+one sig Neg0 extends Neg {}
+fact { root in (Neg + F + G + X) and root.l = Neg0 }
