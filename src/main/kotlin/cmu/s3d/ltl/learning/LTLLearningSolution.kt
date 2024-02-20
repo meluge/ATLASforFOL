@@ -44,10 +44,14 @@ class LTLLearningSolution(private val world: CompModule, private val alloySoluti
         val (name, leftNode, rightNode) = getNodeAndChildren(node)
         return when {
             leftNode == null && rightNode == null -> name
-            leftNode != null && rightNode == null -> "${operatorMapping[name]}(${getLTL2(leftNode)})"
-            leftNode != null && rightNode != null -> "${operatorMapping[name]}(${getLTL2(leftNode)},${getLTL2(rightNode)})"
+            leftNode != null && rightNode == null -> "${getMappedOperator(name)}(${getLTL2(leftNode)})"
+            leftNode != null && rightNode != null -> "${getMappedOperator(name)}(${getLTL2(leftNode)},${getLTL2(rightNode)})"
             else -> error("Invalid LTL formula.")
         }
+    }
+
+    private fun getMappedOperator(name: String): String {
+        return operatorMapping[name.replace("\\d+$".toRegex(), "")] ?: error("Invalid operator: $name")
     }
 
     fun getNodeAndChildren(node: String): Node {

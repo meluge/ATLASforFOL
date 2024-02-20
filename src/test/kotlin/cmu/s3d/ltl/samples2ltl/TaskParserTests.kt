@@ -144,4 +144,16 @@ class TaskParserTests {
             solution!!.getLTL2()
         )
     }
+
+    @Test
+    fun testf_01_nw_010_type_0() {
+        val content = ClassLoader.getSystemResource("samples2ltl/f_01-nw_010-ml_06-0.type-0.trace").readText()
+        val task = TaskParser.parseTask(content)
+        val solution = task.buildLearner().learn()
+        assert(solution != null)
+        assertEquals(
+            "G(!(x0))",
+            solution!!.getLTL2()
+        )
+    }
 }
