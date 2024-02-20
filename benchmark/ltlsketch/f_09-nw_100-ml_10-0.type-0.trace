@@ -206,4 +206,6 @@ G,F,!,U,&,|,->,X
 ---
 G(->(x1,G(x0)))
 ---
-fact { root in G and root.l in Imply and root.l.l in x1 }
+one sig G0 extends G {}
+one sig Imply0 extends Imply {}
+fact { root = G0 and root.l = Imply0 and root.l.l = x1 }

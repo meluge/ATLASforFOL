@@ -56,4 +56,7 @@ G,F,!,U,&,|,->,X
 ---
 |(G(!(x0)),F(&(x0,F(x1))))
 ---
-fact { root in Or and root.r in F and root.r.l in And and root.r.l.l in x0 and root.r.l.r in F and root.r.l.r.l in x1 }
+one sig F0,F1 extends F {}
+one sig And0 extends And {}
+one sig Or0 extends Or {}
+fact { root = Or0 and root.r = F0 and root.r.l = And0 and root.r.l.l = x0 and root.r.l.r = F1 and root.r.l.r.l = x1 }

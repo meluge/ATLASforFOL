@@ -206,4 +206,6 @@ G,F,!,U,&,|,->,X
 ---
 ->(F(x1),U(x0,x1))
 ---
-fact { root in Imply and root.r in Until and root.r.l in x0 and root.r.r in x1 }
+one sig Until0 extends Until {}
+one sig Imply0 extends Imply {}
+fact { root = Imply0 and root.r = Until0 and root.r.l = x0 and root.r.r = x1 }

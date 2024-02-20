@@ -206,4 +206,5 @@ G,F,!,U,&,|,->,X
 ---
 F(x0)
 ---
-fact { root in F }
+one sig F0 extends F {}
+fact { root = F0 }

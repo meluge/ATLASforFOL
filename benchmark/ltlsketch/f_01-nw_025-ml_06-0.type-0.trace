@@ -56,4 +56,6 @@ G,F,!,U,&,|,->,X
 ---
 G(!(x0))
 ---
-fact { root in G and root.l in Neg }
+one sig G0 extends G {}
+one sig Neg0 extends Neg {}
+fact { root = G0 and root.l = Neg0 }
