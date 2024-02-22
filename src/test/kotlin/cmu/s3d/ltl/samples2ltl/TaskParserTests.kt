@@ -2,6 +2,7 @@ package cmu.s3d.ltl.samples2ltl
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class TaskParserTests {
     @Test
@@ -153,6 +154,30 @@ class TaskParserTests {
         assert(solution != null)
         assertEquals(
             "G(!(x0))",
+            solution!!.getLTL2()
+        )
+    }
+
+    @Test
+    fun testExample0007() {
+        val content = ClassLoader.getSystemResource("samples2ltl/example0007.trace").readText()
+        val task = TaskParser.parseTask(content)
+        val solution = task.buildLearner().learn()
+        assert(solution != null)
+        assertEquals(
+            "U(x0,x1)",
+            solution!!.getLTL2()
+        )
+    }
+
+    @Test
+    fun testBase0007() {
+        val content = ClassLoader.getSystemResource("samples2ltl/base/0007.trace").readText()
+        val task = TaskParser.parseTask(content)
+        val solution = task.buildLearner().learn()
+        assert(solution != null)
+        assertNotEquals(
+            "U(->(x2,x2),!(->(x2,x2)))",
             solution!!.getLTL2()
         )
     }

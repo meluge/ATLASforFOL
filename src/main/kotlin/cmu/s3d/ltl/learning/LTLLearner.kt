@@ -91,12 +91,9 @@ class LTLLearner(
                 ${
                     if ("Until" in binaryOp)
                         """
-                all n: Until, i: seqRange | n->i in valuation iff some i': futureIdx[i] {
-            		n.r->i' in valuation
-            		all i'': futureIdx[i] {
-            			gte[i', i] implies (lt[i'', i'] implies n.l->i'' in valuation)
-            					   else ((lt[i'', i'] or gte[i'', i]) implies n.l->i'' in valuation)
-            		}
+                all n: Until, i: seqRange | n->i in valuation iff {
+                    some i': futureIdx[i] | n.r->i' in valuation
+                    n.r->i in valuation or (n.l->i in valuation and n->i.(next+lasso) in valuation)
             	}"""
                     else
                         ""
