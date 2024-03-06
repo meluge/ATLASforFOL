@@ -32,10 +32,11 @@ class LTLLearningSolution(private val world: CompModule, private val alloySoluti
 
     private fun getLTL(node: String): String {
         val (name, leftNode, rightNode) = getNodeAndChildren(node)
+        val sigName = name.replace("\\d+$".toRegex(), "")
         return when {
             leftNode == null && rightNode == null -> name
-            leftNode != null && rightNode == null -> "($name ${getLTL(leftNode)})"
-            leftNode != null && rightNode != null -> "($name ${getLTL(leftNode)} ${getLTL(rightNode)})"
+            leftNode != null && rightNode == null -> "($sigName ${getLTL(leftNode)})"
+            leftNode != null && rightNode != null -> "($sigName ${getLTL(leftNode)} ${getLTL(rightNode)})"
             else -> error("Invalid LTL formula.")
         }
     }
