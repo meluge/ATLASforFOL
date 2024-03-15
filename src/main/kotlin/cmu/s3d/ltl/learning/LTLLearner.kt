@@ -181,10 +181,6 @@ class LTLLearner(
             val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
 
             if (solution.satisfiable()) {
-                for (a in solution.allAtoms)
-                    world.addGlobal(a.label, a)
-                for (a in solution.allSkolems)
-                    world.addGlobal(a.label, a)
                 return LTLLearningSolution(world, solution)
             }
         }

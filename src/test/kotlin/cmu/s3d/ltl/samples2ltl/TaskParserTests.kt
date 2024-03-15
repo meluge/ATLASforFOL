@@ -15,7 +15,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))", "!(F(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)
@@ -35,7 +35,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
         assertEquals("fact {\n    root in G\n}", task.customConstraints)
 
         val solution = task.buildLearner().learn()
@@ -56,7 +56,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)
@@ -76,7 +76,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)
@@ -96,7 +96,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)
@@ -116,7 +116,7 @@ class TaskParserTests {
         assertEquals(3, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)
@@ -136,7 +136,7 @@ class TaskParserTests {
         assertEquals(2, task.maxNumOfOP)
         assertEquals(2, task.numOfVariables())
         assertEquals(5, task.maxLengthOfTraces())
-        assertEquals("G(!(x0))", task.expected)
+        assertEquals(listOf("G(!(x0))"), task.expected)
 
         val solution = task.buildLearner().learn()
         assert(solution != null)

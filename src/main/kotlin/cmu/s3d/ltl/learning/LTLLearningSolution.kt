@@ -7,6 +7,13 @@ import edu.mit.csail.sdg.translator.A4TupleSet
 
 class LTLLearningSolution(private val world: CompModule, private val alloySolution: A4Solution) {
 
+    init {
+        for (a in alloySolution.allAtoms)
+            world.addGlobal(a.label, a)
+        for (a in alloySolution.allSkolems)
+            world.addGlobal(a.label, a)
+    }
+
     data class Node(val name: String, val left: String?, val right: String?)
 
     private val operatorMapping = mapOf(

@@ -12,7 +12,7 @@ data class Task(
     val negativeExamples: List<LassoTrace>,
     val excludedOperators: List<String>,
     val maxNumOfOP: Int,
-    val expected: String?,
+    val expected: List<String>,
     val customConstraints: String?
 ) {
     fun buildLearner(options: A4Options? = null, minimized: Boolean = true): LTLLearner {
@@ -77,7 +77,7 @@ object TaskParser {
                 (2.0).pow(it.toInt()) - 1
             }
         }.toInt()
-        val expected = if (parts.size > 4) parts[4].trim() else null
+        val expected = if (parts.size > 4) parts[4].split(';').map { it.trim() } else emptyList()
         val constraints = if (parts.size > 5) parts[5].trim() else null
 
         val positiveExamples = parseExamples(positives)
