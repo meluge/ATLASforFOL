@@ -16,7 +16,7 @@ import java.nio.file.Paths
 import java.util.*
 
 class CLI : CliktCommand(
-    name = "LTL-Learning",
+    name = "Atlas",
     help = "A tool to learn LTL formulas from a set of positive and negative examples by using AlloyMax."
 ) {
     private val _run by option("--_run", help = "Run the learning process. YOU SHOULD NOT USE THIS. INTERNAL USE ONLY.")
