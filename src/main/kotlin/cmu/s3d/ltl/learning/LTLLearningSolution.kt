@@ -5,7 +5,13 @@ import edu.mit.csail.sdg.parser.CompUtil
 import edu.mit.csail.sdg.translator.A4Solution
 import edu.mit.csail.sdg.translator.A4TupleSet
 
-class LTLLearningSolution(private val world: CompModule, private val alloySolution: A4Solution) {
+class LTLLearningSolution(
+    private val learner: LTLLearner,
+    private val world: CompModule,
+    private val alloySolution: A4Solution,
+    private val numOfNode: Int,
+    private val stepSize: Int
+) {
 
     init {
         for (a in alloySolution.allAtoms)
@@ -79,9 +85,9 @@ class LTLLearningSolution(private val world: CompModule, private val alloySoluti
     fun next(): LTLLearningSolution? {
         val nextSolution = alloySolution.next()
         return if (nextSolution.satisfiable()) {
-            LTLLearningSolution(world, nextSolution)
+            LTLLearningSolution(learner, world, nextSolution, numOfNode, stepSize)
         } else {
-            null
+            learner.learn(numOfNode + stepSize)
         }
     }
 }

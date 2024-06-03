@@ -181,7 +181,7 @@ class LTLLearner(
             val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
 
             if (solution.satisfiable()) {
-                return LTLLearningSolution(world, solution)
+                return LTLLearningSolution(this, world, solution, n, stepSize)
             }
         }
 
