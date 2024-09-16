@@ -8,8 +8,14 @@ import edu.mit.csail.sdg.translator.TranslateAlloyToKodkod
 open class AlloyMaxBase(private val customAlloyOptions: A4Options?) {
     companion object {
         fun defaultAlloyOptions(): A4Options {
+            val solverType = when (System.getProperty("alloy.solver")) {
+                "SAT4JMax" -> A4Options.SatSolver.SAT4JMax
+                "OpenWBO" -> A4Options.SatSolver.OpenWBO
+                "OpenWBOWeighted" -> A4Options.SatSolver.OpenWBOWeighted
+                else -> A4Options.SatSolver.SAT4JMax
+            }
             return A4Options().apply {
-                solver = A4Options.SatSolver.SAT4JMax
+                solver = solverType
                 skolemDepth = 1
                 noOverflow = false
                 inferPartialInstance = true
@@ -28,7 +34,7 @@ open class AlloyMaxBase(private val customAlloyOptions: A4Options?) {
     private fun alloyColdStart() {
         val reporter = A4Reporter.NOP
         val world = CompUtil.parseEverything_fromString(reporter, "")
-        val options = defaultAlloyOptions()
+        val options = defaultAlloyOptions().apply { solver = A4Options.SatSolver.SAT4JMax }
         val command = world.allCommands.first()
         TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
     }
