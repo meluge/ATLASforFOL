@@ -12,6 +12,9 @@ java -jar lib/AlloyMax-1.0.3.jar
 ```
 Click the *Execute* button on the GUI. It should find an instance, which indicates that Alloy can successfully run on your machine. Then, you can close the AlloyMax GUI.
 
+**Note:**
+The above step may not be necessary because explicitly providing the library path using `-Djava.library.path` can let AlloyMax successfully find the third-party libraries such as OpenWBO.
+
 ## Task file
 We extend the problem format from [samples2LTL](https://github.com/ivan-gavran/samples2LTL) to define a problem. The file looks like:
 ```
