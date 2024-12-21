@@ -20,7 +20,7 @@ docker run -it --rm changjianzhangcmu/atlas
 
 Run Atlas inside Docker container:
 ```
-java -Djava.library.path=./lib -cp bin/Atlas.jar cmu.s3d.ltl.app.CLIKt -f benchmark/5to10Traces/0000.trace -s OpenWBOWeighted
+java -cp bin/Atlas.jar cmu.s3d.ltl.app.CLIKt -f benchmark/5to10Traces/0000.trace
 ```
 The output should look like:
 ```
@@ -90,6 +90,8 @@ You can also choose to use OpenWBO as the backend MaxSAT solver:
 java -Djava.library.path=./lib -cp bin/Atlas.jar cmu.s3d.ltl.app.CLIKt -f benchmark/5to10Traces/0000.trace -s OpenWBOWeighted
 ```
 
+**Note:**
+This repo only provides the OpenWBO MaxSAT solver for linux-amd64. Thus, to use OpenWBO, it needs to run on a Linux amd64 machine. It is possible to use it inside the Docker image. However, a known issue is that the performance of OpenWBO is dramatically slow in Docker container when using a Mac as the host machine.
 
 
 ## Usage
