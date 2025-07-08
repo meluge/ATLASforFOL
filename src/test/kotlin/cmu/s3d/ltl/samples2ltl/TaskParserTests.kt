@@ -1,184 +1,75 @@
-package cmu.s3d.ltl.samples2ltl
+package cmu.s3d.fol.samples2fol
 
+import cmu.s3d.fol.samples2fol.FOLTaskParser
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 
-class TaskParserTests {
+class FOLTaskParserTests {
     @Test
-    fun testExample0000() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0000.trace").readText()
-        val task = TaskParser.parseTask(content)
+    fun testJsonFormat() {
+        val jsonContent = """
+        {
+            "sorts": ["Node"],
+            "relations": [
+                {"name": "edge", "signature": ["Node", "Node"]}
+            ],
+            "functions": [],
+            "positiveExamples": [
+                {
+                    "constants": [
+                        {"name": "a", "sort": "Node"},
+                        {"name": "b", "sort": "Node"}
+                    ],
+                    "relationFacts": {
+                        "edge": [["a", "b"], ["b", "a"]]
+                    }
+                }
+            ],
+            "negativeExamples": [
+                {
+                    "constants": [
+                        {"name": "c", "sort": "Node"}
+                    ],
+                    "relationFacts": {
+                        "edge": []
+                    }
+                }
+            ],
+            "maxNodes": 5
+        }
+        """.trimIndent()
 
-        assertEquals(5, task.numOfPositives())
-        assertEquals(5, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))", "!(F(x0))"), task.expected)
+        val task = FOLTaskParser.parseTask(jsonContent)
 
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "!(F(x0))",
-            solution!!.getLTL2()
-        )
+        assertEquals(1, task.sorts.size)
+        assertEquals("Node", task.sorts[0].name)
+        assertEquals(1, task.relations.size)
+        assertEquals("edge", task.relations[0].name)
+        assertEquals(1, task.positiveExamples.size)
+        assertEquals(1, task.negativeExamples.size)
+        assertEquals(5, task.maxNumOfNode)
     }
 
     @Test
-    fun testExample0001() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0001.trace").readText()
-        val task = TaskParser.parseTask(content)
-
-        assertEquals(5, task.numOfPositives())
-        assertEquals(5, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-        assertEquals("fact {\n    root in G\n}", task.customConstraints)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "G(!(x0))",
-            solution!!.getLTL2()
+    fun testSExprFormat() {
+        val sexprContent = """
+        (sort Node)
+        (relation edge Node Node)
+        (model + 
+            ((a Node) (b Node))
+            (edge a b)
+            (edge b a)
         )
-    }
-
-    @Test
-    fun testExample0002() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0002.trace").readText()
-        val task = TaskParser.parseTask(content)
-
-        assertEquals(0, task.numOfPositives())
-        assertEquals(5, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "G(x0)",
-            solution!!.getLTL2()
+        (model -
+            ((c Node))
         )
-    }
+        """.trimIndent()
 
-    @Test
-    fun testExample0003() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0003.trace").readText()
-        val task = TaskParser.parseTask(content)
+        val task = FOLTaskParser.parseTask(sexprContent)
 
-        assertEquals(5, task.numOfPositives())
-        assertEquals(0, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "->(x1,x1)",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testExample0004() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0004.trace").readText()
-        val task = TaskParser.parseTask(content)
-
-        assertEquals(5, task.numOfPositives())
-        assertEquals(0, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "F(x1)",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testExample0005() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0005.trace").readText()
-        val task = TaskParser.parseTask(content)
-
-        assertEquals(5, task.numOfPositives())
-        assertEquals(5, task.numOfNegatives())
-        assertEquals(3, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "!(F(x0))",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testExample0006() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0006.trace").readText()
-        val task = TaskParser.parseTask(content)
-
-        assertEquals(5, task.numOfPositives())
-        assertEquals(5, task.numOfNegatives())
-        assertEquals(2, task.maxNumOfOP)
-        assertEquals(2, task.numOfVariables())
-        assertEquals(5, task.maxLengthOfTraces())
-        assertEquals(listOf("G(!(x0))"), task.expected)
-
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "!(F(x0))",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testf_01_nw_010_type_0() {
-        val content = ClassLoader.getSystemResource("samples2ltl/f_01-nw_010-ml_06-0.type-0.trace").readText()
-        val task = TaskParser.parseTask(content)
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "G(!(x0))",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testExample0007() {
-        val content = ClassLoader.getSystemResource("samples2ltl/example0007.trace").readText()
-        val task = TaskParser.parseTask(content)
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertEquals(
-            "U(x0,x1)",
-            solution!!.getLTL2()
-        )
-    }
-
-    @Test
-    fun testBase0007() {
-        val content = ClassLoader.getSystemResource("samples2ltl/base/0007.trace").readText()
-        val task = TaskParser.parseTask(content)
-        val solution = task.buildLearner().learn()
-        assert(solution != null)
-        assertNotEquals(
-            "U(->(x2,x2),!(->(x2,x2)))",
-            solution!!.getLTL2()
-        )
+        assertEquals(1, task.sorts.size)
+        assertEquals(1, task.relations.size)
+        assertEquals(1, task.positiveExamples.size)
+        assertEquals(1, task.negativeExamples.size)
     }
 }

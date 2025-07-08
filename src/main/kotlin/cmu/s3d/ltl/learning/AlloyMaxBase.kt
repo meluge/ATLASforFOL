@@ -1,4 +1,4 @@
-package cmu.s3d.ltl.learning
+package cmu.s3d.fol.learning
 
 import edu.mit.csail.sdg.alloy4.A4Reporter
 import edu.mit.csail.sdg.parser.CompUtil

@@ -1,9 +1,9 @@
-package cmu.s3d.ltl.app
+package cmu.s3d.fol.app
 
-import cmu.s3d.ltl.learning.AlloyMaxBase
-import cmu.s3d.ltl.learning.LTLLearningSolution
-import cmu.s3d.ltl.samples2ltl.Task
-import cmu.s3d.ltl.samples2ltl.TaskParser
+import cmu.s3d.fol.learning.AlloyMaxBase
+import cmu.s3d.fol.samples2fol.FOLTaskParser
+import cmu.s3d.fol.samples2fol.buildLearner
+import cmu.s3d.fol.samples2fol.toCSVString
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -11,139 +11,87 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import edu.mit.csail.sdg.translator.A4Options
 import java.io.File
-import java.lang.management.ManagementFactory
-import java.nio.file.Paths
-import java.util.*
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class CLI : CliktCommand(
-    name = "Atlas",
-    help = "A tool to learn LTL formulas from a set of positive and negative examples by using AlloyMax."
+    name = "FOL-Atlas",
+    help = "A tool to learn FOL formulas from positive and negative examples using AlloyMax."
 ) {
-    private val _run by option("--_run", help = "Run the learning process. YOU SHOULD NOT USE THIS. INTERNAL USE ONLY.")
     private val solver by option("--solver", "-s", help = "The AlloyMax solver to use. Default: SAT4JMax").default("SAT4JMax")
     private val filename by option("--filename", "-f", help = "The file containing one task to run.")
     private val traces by option("--traces", "-t", help = "The folder containing the tasks to run. It will find all task files under the folder recursively.")
     private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").int().default(0)
     private val model by option("--model", "-m", help = "Print the model to use for learning.").flag(default = false)
     private val findAny by option("--findAny", "-A", help = "Find any solution. Default: false").flag(default = false)
-    private val expected by option("--expected", "-e", help = "Enumerate until the expected formula found.").flag(default = false)
 
     override fun run() {
-        val options = AlloyMaxBase.defaultAlloyOptions()
-        options.solver = when (solver) {
-            "SAT4JMax" -> A4Options.SatSolver.SAT4JMax
-            "OpenWBO" -> A4Options.SatSolver.OpenWBO
-            "OpenWBOWeighted" -> A4Options.SatSolver.OpenWBOWeighted
-            "POpenWBO" -> A4Options.SatSolver.POpenWBO
-            "POpenWBOAuto" -> A4Options.SatSolver.POpenWBOAuto
-            "SAT4J" -> A4Options.SatSolver.SAT4J
-            "MiniSat" -> A4Options.SatSolver.MiniSatJNI
-            else -> throw IllegalArgumentException("Unknown solver: $solver")
-        }
-
-        if (_run != null) {
-            val f = File(_run!!)
-            if (f.isFile && f.name.endsWith(".trace")) {
-//                println("--- solving ${f.name}")
-                val task = TaskParser.parseTask(f.readText())
-                try {
-                    val learner = task.buildLearner(options, !findAny)
-                    if (model)
-                        println(learner.generateAlloyModel().trimIndent())
-                    val startTime = System.currentTimeMillis()
-                    val solution = learner.learn()
-                    val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
-                    val formula = if (!expected) solution?.getLTL2() ?: "UNSAT" else findExpected(task, solution)
-                    println("$_run,${task.toCSVString()},$solvingTime,\"$formula\"")
-                } catch (e: Exception) {
-                    val message = e.message?.replace("\\v".toRegex(), " ") ?: "Unknown error"
-                    println("$_run,${task.toCSVString()},\"ERR:$message\",-")
-                }
-            }
-            return
-        }
-
         if (filename == null && traces == null) {
             println("Please provide a filename or a folder with traces.")
             return
         }
 
-        println("filename,numOfPositives,numOfNegatives,maxNumOfOP,numOfVariables,maxLengthOfTraces,expected,solvingTime,formula")
+        println("filename,numOfPositives,numOfNegatives,maxNumOfOP,numOfSorts,numOfRelations,solvingTime,formula")
+
         if (filename != null) {
             val f = File(filename!!)
-            if (f.isFile && f.name.endsWith(".trace")) {
-                runInSubProcess(f, filename!!)
+            if (f.isFile && (f.name.endsWith(".fol") || f.name.endsWith(".json"))) {
+                runLearningTask(f, filename!!)
             } else {
-                error("The file $filename does not exist or is not a .trace file.")
+                error("The file $filename does not exist or is not a .fol/.json file.")
             }
         } else if (traces != null) {
             val folder = File(traces!!)
             if (folder.isDirectory) {
                 folder.walk()
-                    .filter { it.isFile && it.name.endsWith(".trace") }
-                    .forEach { runInSubProcess(it, Paths.get(traces!!, it.absolutePath.substringAfter(traces!!)).toString())  }
+                    .filter { it.isFile && (it.name.endsWith(".fol") || it.name.endsWith(".json")) }
+                    .forEach { runLearningTask(it, it.path) }
             }
         }
     }
 
-    private fun findExpected(task: Task, solution: LTLLearningSolution?): String {
-        var sol = solution
-        var formula = sol?.getLTL2()
-        while (sol != null && !task.expected.contains(formula)) {
-            sol = sol.next()
-            formula = sol?.getLTL2()
+    private fun runLearningTask(f: File, pathName: String) {
+        val options = AlloyMaxBase.defaultAlloyOptions()
+        options.solver = when (solver) {
+            "SAT4JMax" -> A4Options.SatSolver.SAT4JMax
+            "OpenWBO" -> A4Options.SatSolver.OpenWBO
+            else -> A4Options.SatSolver.SAT4JMax
         }
-        return formula ?: "UNSAT"
-    }
 
-    private fun runInSubProcess(f: File, pathName: String) {
-        val jvmArgs = ManagementFactory.getRuntimeMXBean().inputArguments
-        val jvmXms = jvmArgs.find { it.startsWith("-Xms") }
-        val jvmXmx = jvmArgs.find { it.startsWith("-Xmx") }
+        val task = FOLTaskParser.parseTask(f.readText(), f.name)
 
-        val cmd = mutableListOf(
-            "java",
-            jvmXms ?: "-Xms512m",
-            jvmXmx ?: "-Xmx4g",
-            "-Djava.library.path=${System.getProperty("java.library.path")}",
-            "-cp",
-            System.getProperty("java.class.path"),
-            "cmu.s3d.ltl.app.CLIKt",
-            "--_run",
-            pathName,
-            "-s",
-            solver,
-        )
-        if (model) cmd.add("-m")
-        if (findAny) cmd.add("-A")
-        if (expected) cmd.add("-e")
+        // Add debug output
+        println("Parsed task: ${task.sorts.size} sorts, ${task.relations.size} relations")
+        println("Positive examples: ${task.positiveExamples.size}")
+        println("Negative examples: ${task.negativeExamples.size}")
+        println("Max nodes: ${task.maxNumOfNode}")
 
-        val processBuilder = ProcessBuilder(cmd)
-        processBuilder.redirectErrorStream(true)
-        val process = processBuilder.start()
+        val learner = task.buildLearner(options, !findAny)
+        if (model) {
+            println(learner.generateAlloyModel().trimIndent())
+            return  // Exit early if just printing model
+        }
 
-        try {
-            val timer = Timer(true)
-            if (timeout > 0) {
-                timer.schedule(object : TimerTask() {
-                    override fun run() {
-                        if (process.isAlive) {
-                            process.destroy()
+        val executor = Executors.newSingleThreadExecutor()
+        val future = executor.submit {
+            val startTime = System.currentTimeMillis()
+            println("Starting learning process...")
+            val solution = learner.learn()
+            val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
 
-                            val task = TaskParser.parseTask(f.readText())
-                            println("$pathName,${task.toCSVString()},TO,-")
-                        }
-                    }
-                }, timeout.toLong() * 1000)
+            if (solution != null) {
+                println(solution.debugFormulaStructure())
+                println("Solution found!")
+                val formula = solution.getFOL2()
+                println("Formula: $formula")
+                println("$pathName,${task.toCSVString()},$solvingTime,\"$formula\"")
+            } else {
+                println("No solution found (UNSAT)")
+                println("$pathName,${task.toCSVString()},$solvingTime,UNSAT")
             }
-            val output = process.inputStream.bufferedReader().readText()
-            print(output)
-
-            process.waitFor()
-            timer.cancel()
-        } catch (e: Exception) {
-            process.destroyForcibly()
         }
+
     }
 }
 

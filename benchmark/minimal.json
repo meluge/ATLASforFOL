@@ -1,0 +1,85 @@
+{
+  "sorts": ["Node"],
+  "relations": [
+    {
+      "name": "edge",
+      "signature": ["Node", "Node"]
+    }
+  ],
+  "positiveExamples": [
+    {
+      "constants": [
+        {"name": "e0", "sort": "Node"},
+        {"name": "e1", "sort": "Node"}
+      ],
+      "relationFacts": {
+        "edge": []
+      }
+    },
+    {
+      "constants": [
+        {"name": "e0", "sort": "Node"},
+        {"name": "e1", "sort": "Node"},
+        {"name": "e2", "sort": "Node"}
+      ],
+      "relationFacts": {
+        "edge": [
+          ["e1", "e2"],
+          ["e2", "e1"]
+        ]
+      }
+    },
+    {
+      "constants": [
+        {"name": "e0", "sort": "Node"},
+        {"name": "e1", "sort": "Node"},
+        {"name": "e2", "sort": "Node"},
+        {"name": "e3", "sort": "Node"}
+      ],
+      "relationFacts": {
+        "edge": [
+          ["e1", "e2"],
+          ["e2", "e1"],
+          ["e2", "e3"],
+          ["e3", "e2"]
+        ]
+      }
+    }
+  ],
+  "negativeExamples": [
+    {
+      "constants": [
+        {"name": "e1", "sort": "Node"},
+        {"name": "e2", "sort": "Node"},
+        {"name": "e3", "sort": "Node"}
+      ],
+      "relationFacts": {
+        "edge": [
+          ["e1", "e2"],
+          ["e2", "e1"],
+          ["e2", "e3"],
+          ["e3", "e2"],
+          ["e1", "e3"],
+          ["e3", "e1"]
+        ]
+      }
+    },
+    {
+      "constants": [
+        {"name": "e0", "sort": "Node"},
+        {"name": "e1", "sort": "Node"},
+        {"name": "e2", "sort": "Node"},
+        {"name": "e3", "sort": "Node"}
+      ],
+      "relationFacts": {
+        "edge": [
+          ["e0", "e1"],
+          ["e1", "e0"],
+          ["e2", "e3"],
+          ["e3", "e2"]
+        ]
+      }
+    }
+  ],
+  "maxNodes": 6
+}
