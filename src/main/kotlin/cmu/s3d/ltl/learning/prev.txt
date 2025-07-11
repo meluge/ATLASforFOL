@@ -1,0 +1,293 @@
+package cmu.s3d.fol.learning
+import kotlin.math.pow
+
+
+import cmu.s3d.fol.*
+import edu.mit.csail.sdg.alloy4.A4Reporter
+import edu.mit.csail.sdg.parser.CompUtil
+import edu.mit.csail.sdg.translator.A4Options
+import edu.mit.csail.sdg.translator.TranslateAlloyToKodkod
+import kotlin.math.max
+import kotlin.math.min
+
+data class FOLTask(
+    val sorts: List<FOLSort>,
+    val relations: List<FOLRelation>,
+    val functions: List<FOLFunction>,
+    val positiveExamples: List<FOLExample>,
+    val negativeExamples: List<FOLExample>,
+    val maxNumOfNode: Int = 8,
+    val excludedOperators: List<String> = emptyList(),
+    val customConstraints: String = ""
+)
+
+
+
+
+class FOLLearner(
+    private val task: FOLTask,
+    customAlloyOptions: A4Options? = null,
+    private val minimized: Boolean = true,
+) : AlloyMaxBase(customAlloyOptions) {
+
+
+    fun generateAlloyModel(scope: Int): String {
+        val maxElements = max(
+            task.positiveExamples.maxOfOrNull { it.structure.constants.size } ?: 0,
+            task.negativeExamples.maxOfOrNull { it.structure.constants.size } ?: 0
+        )
+
+        val maxArity = max(
+            task.relations.maxOfOrNull { it.arity } ?: 2,
+            task.functions.maxOfOrNull { it.arity } ?: 2
+        )
+
+        // This is the final, correct, and performant Alloy model template.
+        val alloyScript = """
+        open util/ordering[Idx] as IdxOrder
+
+        abstract sig Idx {}
+        one sig ${(0 until maxArity).joinToString(", ") { "I$it" }} extends Idx {}
+        fact { IdxOrder/first = I0 ${if (maxArity > 1) "and IdxOrder/next = " + (0 until maxArity-1).joinToString(" + ") { "I$it->I${it+1}" } else ""} }
+
+        abstract sig Variable {}
+        abstract sig Element { sort: one Sort }
+        abstract sig Sort {}
+
+        abstract sig Symbol {
+            arity: one Int,
+            signature: Idx -> Sort
+        } {
+            arity > 0
+            all i: Idx | some signature[i] iff #(i.prevs + i) <= arity
+        }
+
+        abstract sig Tuple { tup : Idx -> lone Element }
+        abstract sig Relation extends Symbol {}
+        abstract sig Function extends Symbol {} { arity > 1 }
+
+        // --- Formula Structure (Syntax) ---
+        abstract sig Formula {}
+        abstract sig Term {}
+
+        sig VarTerm extends Term { var: one Variable }
+        sig ConstTerm extends Term { constant: one Element }
+        sig FuncTerm extends Term { func: one Function, args: Idx -> lone Term }
+
+        sig Atom extends Formula { relation: one Relation, terms: Idx -> lone Term }
+        abstract sig Quantifier extends Formula { bound_var: one Variable, var_sort: one Sort, body: one Formula }
+        sig Forall extends Quantifier {}
+        sig Exists extends Quantifier {}
+        abstract sig UnaryConnective extends Formula { child: one Formula }
+        sig Not extends UnaryConnective {}
+        abstract sig BinaryConnective extends Formula { left: one Formula, right: one Formula } { left != right }
+        sig And extends BinaryConnective {}
+        sig Or extends BinaryConnective {}
+        sig Implies extends BinaryConnective {}
+
+        // --- Structure Definitions (No Semantics) ---
+        abstract sig Structure {
+            elements: set Element,
+            interpretation: Relation -> set Tuple,
+            func_interpretation: Function -> set Tuple
+        }
+        abstract sig PositiveStructure extends Structure {}
+        abstract sig NegativeStructure extends Structure {}
+
+        // --- SEMANTICS DEFINED AS PURE RELATIONS (NON-RECURSIVE) ---
+
+        one sig TermEvaluation {
+            term_eval_rel: set Structure -> set (Variable -> lone Element) -> set Term -> set Element
+        }
+
+        one sig FormulaEvaluation {
+            formula_eval_rel: set Structure -> set (Variable -> lone Element) -> set Formula
+        }
+
+        fact Semantics {
+            // Define Term Evaluation
+            all s: Structure, m: Variable -> lone Element, t: Term, e: Element |
+                (s->m->t->e in TermEvaluation.term_eval_rel) iff (
+                    (t in VarTerm and e in m[t.var]) or
+                    (t in ConstTerm and e in t.constant & s.elements) or
+                    (t in FuncTerm and some tuple: s.func_interpretation[t.func] |
+                        (all i: t.args.Idx | some arg_e: Element | (s->m->t.args[i]->arg_e in TermEvaluation.term_eval_rel) and tuple.tup[i] = arg_e) and
+                        tuple.tup[last[t.func.arity]] = e
+                    )
+                )
+
+            // Define Formula Evaluation
+            all s: Structure, m: Variable -> lone Element, f: Formula |
+                (s->m->f in FormulaEvaluation.formula_eval_rel) iff (
+                    (f in Atom and (
+                        let term_evals = { i: Idx, e: Element | s->m->f.terms[i]->e in TermEvaluation.term_eval_rel } |
+                        some interp_tup: s.interpretation[f.relation] | interp_tup.tup in term_evals
+                    )) or
+                    (f in Not and not (s->m->f.child in FormulaEvaluation.formula_eval_rel)) or
+                    (f in And and (s->m->f.left in FormulaEvaluation.formula_eval_rel) and (s->m->f.right in FormulaEvaluation.formula_eval_rel)) or
+                    (f in Or and ((s->m->f.left in FormulaEvaluation.formula_eval_rel) or (s->m->f.right in FormulaEvaluation.formula_eval_rel))) or
+                    (f in Implies and (not (s->m->f.left in FormulaEvaluation.formula_eval_rel) or (s->m->f.right in FormulaEvaluation.formula_eval_rel))) or
+                    (f in Forall and (all e: s.elements | e.sort = f.var_sort implies s->(m ++ (f.bound_var -> e))->f.body in FormulaEvaluation.formula_eval_rel)) or
+                    (f in Exists and (some e: s.elements | e.sort = f.var_sort and s->(m ++ (f.bound_var -> e))->f.body in FormulaEvaluation.formula_eval_rel))
+                )
+        }
+
+        fun last[a: Int]: Idx { {i: Idx | #(i.prevs + i) = a} }
+
+        // --- Structural and Well-Formedness Constraints ---
+        fact FormulaStructure {
+            let all_children = (Quantifier <: body) + (UnaryConnective <: child) + (BinaryConnective <: (left + right)) | {
+                all f: Formula - Separator.root | one f.~all_children
+                Formula = Separator.root.*all_children
+                no f: Formula | f in f.^all_children
+            }
+        }
+
+        fact WellFormedness {
+            all f: Formula | some a: Atom | a in f.*all_children
+            all a: Atom, vt: a.terms[Idx] & VarTerm |
+                some q: Quantifier | q.bound_var = vt.var and a in q.body.*all_children
+            all q: Quantifier |
+                some a: q.body.*all_children & Atom, t: a.terms[Idx] & VarTerm |
+                    t.var = q.bound_var
+            all q1, q2: Quantifier |
+                q2 in q1.body.*all_children implies q1.bound_var != q2.bound_var
+            all a: Atom | #(a.terms) = a.relation.arity
+        }
+
+        one sig Separator { root: one Formula }
+
+        // --- Instance Specific Part ---
+        one sig ${task.sorts.joinToString(", ") { "${it.name}Sort" }} extends Sort {}
+        one sig ${(0 until 4).joinToString(", ") { "V$it" }} extends Variable {}
+        ${generateElements(maxElements)}
+        ${generateRelations()}
+        ${generateFunctions()}
+        ${generateStructureConstraints()}
+
+        ${task.customConstraints}
+
+        pred findSeparator {
+            let root = Separator.root, empty_mapping = none -> none | {
+                all p: PositiveStructure | p->empty_mapping->root in FormulaEvaluation.formula_eval_rel
+                all n: NegativeStructure | not n->empty_mapping->root in FormulaEvaluation.formula_eval_rel
+            }
+        }
+
+        run findSeparator for $scope
+    """.trimIndent()
+
+
+        return alloyScript
+    }
+
+    private fun generateElements(maxElements: Int): String {
+        return (0 until maxElements).joinToString("\n        ") { index ->
+            val sortName = task.sorts.firstOrNull()?.name ?: "DefaultSort"
+            "one sig E$index extends Element {} { sort = ${sortName}Sort }"
+        }
+    }
+
+    private fun generateRelations(): String {
+        return task.relations.joinToString("\n        ") { rel ->
+            """one sig ${rel.name}Rel extends Relation {} {
+                arity = ${rel.arity}
+                signature = ${rel.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
+            }"""
+        }
+    }
+
+    private fun generateFunctions(): String {
+        return if (task.functions.isNotEmpty()) {
+            task.functions.joinToString("\n        ") { func ->
+                """one sig ${func.name}Func extends Function {} {
+                    arity = ${func.arity}
+                    signature = ${func.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
+                }"""
+            }
+        } else ""
+    }
+
+
+    private fun generateStructureConstraints(): String {
+        val structures = mutableListOf<String>()
+        val facts = mutableListOf<String>()
+
+        task.positiveExamples.forEachIndexed { index, example ->
+            val structName = "PS$index"
+            structures.add(generateSimpleStructure(structName, "PositiveStructure", example))
+            facts.add(generateStructureFact(structName, example))
+        }
+
+        task.negativeExamples.forEachIndexed { index, example ->
+            val structName = "NS$index"
+            structures.add(generateSimpleStructure(structName, "NegativeStructure", example))
+            facts.add(generateStructureFact(structName, example))
+        }
+
+        return structures.joinToString("\n        ") + "\n\n        " +
+                facts.joinToString("\n        ")
+    }
+
+    private fun generateSimpleStructure(name: String, sig: String, example: FOLExample): String {
+        return """one sig $name extends $sig {} {
+            elements = ${example.structure.constants.indices.joinToString(" + ") { "E$it" }}
+        }"""
+    }
+
+    private fun generateStructureFact(name: String, example: FOLExample): String {
+        val elementMapping = example.structure.constants.mapIndexed { i, const -> const.name to "E$i" }.toMap()
+        val constraints = mutableListOf<String>()
+
+        task.relations.forEach { rel ->
+            val facts = example.structure.relationFacts[rel.name] ?: emptyList()
+            if (facts.isNotEmpty()) {
+                facts.forEach { tuple ->
+                    val mappedElements = tuple.map { elementMapping[it] ?: "E0" }
+                    val constraint = "some t: $name.interpretation[${rel.name}Rel] | " +
+                            mappedElements.mapIndexed { i, elem -> "t.tup[I$i] = $elem" }.joinToString(" and ")
+                    constraints.add(constraint)
+                }
+                constraints.add("#$name.interpretation[${rel.name}Rel] = ${facts.size}")
+            } else {
+                constraints.add("no $name.interpretation[${rel.name}Rel]")
+            }
+        }
+
+        constraints.add("no $name.func_interpretation")
+
+        return """fact ${name}Constraints {
+            ${constraints.joinToString("\n            ")}
+        }"""
+    }
+
+    fun learn(start: Int? = null, stepSize: Int = 2): FOLLearningSolution? {
+        val startNum = start ?: min(max((task.maxNumOfNode - task.sorts.size) / 2, 3), 6)
+        val nodesSeq = (startNum.. task.maxNumOfNode step stepSize).toMutableList()
+        if (nodesSeq.isEmpty() || nodesSeq.last() < task.maxNumOfNode)
+            nodesSeq.add(task.maxNumOfNode)
+
+        for (n in nodesSeq) {
+            val alloyScript = generateAlloyModel(n)
+
+            println("=== GENERATED ALLOY CODE (Scope: $n) ===")
+            println(alloyScript)
+            println("=== END ALLOY CODE ===")
+
+            val reporter = A4Reporter.NOP
+            val world = CompUtil.parseEverything_fromString(reporter, alloyScript)
+            val options = alloyOptions()
+            val command = world.allCommands.first()
+            val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
+
+            if (solution.satisfiable()) {
+                println("Found a satisfying solution with node count: $n")
+                // You would have a FOLLearningSolution class to parse the result
+                // return FOLLearningSolution(this, world, solution, n, stepSize)
+                return null // Placeholder
+            }
+        }
+
+        return null
+    }
+}

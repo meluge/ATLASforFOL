@@ -16,7 +16,8 @@ data class FOLTask(
     val functions: List<FOLFunction>,
     val positiveExamples: List<FOLExample>,
     val negativeExamples: List<FOLExample>,
-    val maxNumOfNode: Int = 4,
+    val maxNumOfNode: Int = 10,
+    val maxQuantifiers: Int = 3,
     val excludedOperators: List<String> = emptyList(),
     val customConstraints: String = """
         fact OnlyVarTerms {
@@ -27,6 +28,8 @@ data class FOLTask(
     """
 )
 
+
+
 class FOLLearner(
     private val task: FOLTask,
     customAlloyOptions: A4Options? = null,
@@ -34,7 +37,7 @@ class FOLLearner(
 ) : AlloyMaxBase(customAlloyOptions) {
 
 
-    fun generateAlloyModel(): String {
+    fun generateAlloyModel(scope: Int): String {
         val maxElements = max(
             task.positiveExamples.maxOfOrNull { it.structure.constants.size } ?: 0,
             task.negativeExamples.maxOfOrNull { it.structure.constants.size } ?: 0
@@ -45,8 +48,8 @@ class FOLLearner(
             task.functions.maxOfOrNull { it.arity } ?: 2
         )
 
-        val numVariables = 4
-        val numEnvironments = minOf(15, maxElements * numVariables + maxElements * maxElements)
+        val numVariables = task.maxQuantifiers
+        val (generatedEnvs, envCount) = generateAllEnvironments(numVariables, maxElements)
 
         val alloyScript = """
         open util/ordering[Idx] as IdxOrder
@@ -82,7 +85,7 @@ class FOLLearner(
 
         abstract sig Relation extends Symbol {}
         abstract sig Function extends Symbol {} {
-            arity > 1  
+            arity > 1
         }
 
         abstract sig Formula {}
@@ -100,15 +103,13 @@ class FOLLearner(
         sig ConstTerm extends Term {
             constant: one Element
         } {
-            // The evaluation of a constant is the constant itself, but only if
-            // it exists in the structure's set of elements.
             all s: Structure, env: Environment |
                 eval[s][env] = (constant & s.elements)
         }
-        
+
         sig FuncTerm extends Term {
             func: one Function,
-            args: Idx -> lone Term 
+            args: Idx -> lone Term
         } {
             #args = func.arity.minus[1]
             all i: Idx | some args[i] iff #(i.prevs + i) < func.arity
@@ -118,15 +119,15 @@ class FOLLearner(
             all s: Structure, ft: FuncTerm, env: Environment |
                 ft.eval[s][env] = {e: Element |
                     some tuple: s.func_interpretation[ft.func] |
-                        (all i: Idx | some ft.args[i] implies
-                            tuple.tup[i] = ft.args[i].eval[s][env]) and
+                        (all i: Idx | some ft_arg: ft.args[i] |
+                            tuple.tup[i] in ft_arg.eval[s][env]) and
                         tuple.tup[last[ft.func.arity]] = e
                 }
         }
 
         sig Atom extends Formula {
             relation: one Relation,
-            terms: Idx -> lone Term  
+            terms: Idx -> lone Term
         } {
             #terms = relation.arity
             all i: Idx | some terms[i] iff #(i.prevs + i) <= relation.arity
@@ -165,23 +166,8 @@ class FOLLearner(
         abstract sig Structure {
             elements: set Element,
             interpretation: Relation -> set Tuple,
-            func_interpretation: Function -> set Tuple,  
+            func_interpretation: Function -> set Tuple,
             satisfies: Environment -> set Formula
-        } {
-            all f: Function |
-                all t1, t2: func_interpretation[f] |
-                    (all i: Idx | i != last[f.arity] implies t1.tup[i] = t2.tup[i])
-                    implies t1 = t2
-            
-            // Type safety: elements in tuples must match relation signatures
-            all r: Relation, t: interpretation[r] |
-                all i: Idx | some t.tup[i] implies 
-                    t.tup[i].sort = r.signature[i]
-                    
-            // Type safety for function interpretations
-            all f: Function, t: func_interpretation[f] |
-                all i: Idx | some t.tup[i] implies 
-                    t.tup[i].sort = f.signature[i]
         }
 
         abstract sig PositiveStructure extends Structure {}
@@ -189,187 +175,113 @@ class FOLLearner(
 
         fun all_children : Formula -> Formula {
             (Quantifier <: body) + (UnaryConnective <: child) +
-            (BinaryConnective <: left) + (BinaryConnective <: right)
+            (BinaryConnective <: (left + right))
         }
 
         fun extendEnv[env: Environment, v: Variable, e: Element]: Environment {
             {eEnv: Environment | eEnv.mapping = env.mapping ++ (v -> e)}
         }
 
-        fun last[a: Int]: Idx {
-            {i: Idx | #(i.prevs + i) = a}
-        }
-
-        fun getTerms[a: Atom]: set Term {
-            a.terms[Idx]
-        }
-
-        fun getSubterms[t: FuncTerm]: set Term {
-            t.args[Idx]
-        }
-
-        fun funcDeps: Term -> Term {
-            {t: FuncTerm, t': Term | t' in t.args[Idx]}
-        }
+        fun last[a: Int]: Idx { {i: Idx | #(i.prevs + i) = a} }
+        fun getTerms[a: Atom]: set Term { a.terms[Idx] }
 
         fact Semantics {
             all s: Structure {
                 all env: Environment, a: Atom |
                     (env -> a) in s.satisfies iff (
                         some t: s.interpretation[a.relation] |
-                            all i: Idx | some a.terms[i] implies
-                                t.tup[i] = a.terms[i].eval[s][env]
+                            all i: Idx | some term: a.terms[i] |
+                                t.tup[i] in term.eval[s][env]
                     )
-
                 ${if ("Not" !in task.excludedOperators) """
                 all env: Environment, n: Not |
-                    (env -> n) in s.satisfies iff
-                    (env -> n.child) not in s.satisfies
+                    (env -> n) in s.satisfies iff (env -> n.child) not in s.satisfies
                 """ else ""}
-
                 ${if ("And" !in task.excludedOperators) """
                 all env: Environment, a: And |
-                    (env -> a) in s.satisfies iff
-                    ((env -> a.left) in s.satisfies and (env -> a.right) in s.satisfies)
+                    (env -> a) in s.satisfies iff ((env -> a.left) in s.satisfies and (env -> a.right) in s.satisfies)
                 """ else ""}
-
                 ${if ("Or" !in task.excludedOperators) """
                 all env: Environment, o: Or |
-                    (env -> o) in s.satisfies iff
-                    ((env -> o.left) in s.satisfies or (env -> o.right) in s.satisfies)
+                    (env -> o) in s.satisfies iff ((env -> o.left) in s.satisfies or (env -> o.right) in s.satisfies)
                 """ else ""}
-
                 ${if ("Implies" !in task.excludedOperators) """
                 all env: Environment, i: Implies |
-                    (env -> i) in s.satisfies iff
-                    ((env -> i.left) not in s.satisfies or (env -> i.right) in s.satisfies)
+                    (env -> i) in s.satisfies iff (not (env -> i.left) in s.satisfies or (env -> i.right) in s.satisfies)
                 """ else ""}
-
                 ${if ("Forall" !in task.excludedOperators) """
                 all env: Environment, f: Forall |
                     (env -> f) in s.satisfies iff
                     (all e: s.elements | e.sort = f.var_sort implies
-                        let enb = extendEnv[env, f.bound_var, e] |
-                        one enb and (enb -> f.body) in s.satisfies)
+                        (one enb: extendEnv[env, f.bound_var, e] | (enb -> f.body) in s.satisfies))
                 """ else ""}
-
                 ${if ("Exists" !in task.excludedOperators) """
                 all env: Environment, e: Exists |
                     (env -> e) in s.satisfies iff
                     (some elem: s.elements | elem.sort = e.var_sort and
-                        let enb = extendEnv[env, e.bound_var, elem] |
-                        one enb and (enb -> e.body) in s.satisfies)
+                        (one enb: extendEnv[env, e.bound_var, elem] | (enb -> e.body) in s.satisfies))
                 """ else ""}
             }
         }
 
         fact FormulaStructure {
-            // Every formula except the root has exactly one parent
-            all f: Formula - Separator.root | one all_children.f
-            
-            // The formula tree is exactly the closure of the root
+            all f: Formula - Separator.root | one f.~all_children
             Formula = Separator.root.*all_children
-            
-            // No formula is its own ancestor (acyclicity)
             no f: Formula | f in f.^all_children
         }
 
-       fact WellFormedness {
-            // Root must be a quantifier
-            // Separator.root in Quantifier
-            
-            // All formulas must eventually lead to atoms
+        fact WellFormedness {
             all f: Formula | some a: Atom | a in f.*all_children
-            
-            // All variables in atoms must be bound by a quantifier
             all a: Atom, vt: getTerms[a] & VarTerm |
                 some q: Quantifier | q.bound_var = vt.var and a in q.^all_children
-            
-            // For function terms containing variables
-            all a: Atom, ft: getTerms[a] & FuncTerm, vt: getSubterms[ft] & VarTerm |
-                some q: Quantifier | q.bound_var = vt.var and a in q.^all_children
-            
-            // Remove the requirement that all quantified variables must be used
-            // This was preventing valid formulas
-            
-            // No repeated bound variables in nested quantifiers
+            all q: Quantifier |
+                some a: Atom, vt: getTerms[a] & VarTerm |
+                    vt.var = q.bound_var and a in q.^all_children
             all q1, q2: Quantifier |
                 q2 in q1.^all_children implies q1.bound_var != q2.bound_var
-            
-            // Ensure atoms have proper terms
             all a: Atom | #a.terms = a.relation.arity
-            
-            all q: Quantifier |
-        some a: Atom | a in q.^all_children and
-            (some vt: getTerms[a] & VarTerm | vt.var = q.bound_var or
-             some ft: getTerms[a] & FuncTerm, vt: getSubterms[ft] & VarTerm | 
-                vt.var = q.bound_var)
         }
         
-       fact AvoidDegenerateFormulas {
-        no n1, n2: Not | n2 = n1.child
-        no disj a1, a2: Atom |
-            a1.relation = a2.relation and a1.terms = a2.terms
-            
-        no bc: BinaryConnective | bc.left = bc.right
-    }
+        fact QuantifierLimit {
+             #Quantifier <= ${task.maxQuantifiers}
+        }
 
-       
-        fact PreventMixedAtoms {
-            // Each atom should be either all constants OR all variables, not mixed
-            all a: Atom |
-                (all t: getTerms[a] | t in ConstTerm) or
-                (all t: getTerms[a] | t in VarTerm)
+        fact SyntacticRestrictions {
+            all c: And + Or + Implies + Not | no (c.*all_children & Quantifier)
         }
-        
+
+        fact AvoidDegenerateFormulas {
+            // Prevent double negation
+            no n: Not | n.child in Not
+            // Prevent trivial conjunctions/disjunctions like (p and p)
+            no bc: BinaryConnective | bc.left = bc.right
+            // Prevent redundant atoms
+            no disj a1, a2: Atom | a1.relation = a2.relation and a1.terms = a2.terms
+        }
+
         fact EnvironmentIsExtensional {
-    all e1, e2: Environment | e1.mapping = e2.mapping implies e1 = e2
-            }
-            
-            fact VarTermIsUnique {
-                all vt1, vt2: VarTerm | vt1.var = vt2.var implies vt1 = vt2
-            }
-
-            fact ConstTermIsUnique {
-                all ct1, ct2: ConstTerm | ct1.constant = ct2.constant implies ct1 = ct2
-            }
-     
+            all e1, e2: Environment | e1.mapping = e2.mapping implies e1 = e2
+        }
+        fact VarTermIsUnique {
+            all vt1, vt2: VarTerm | vt1.var = vt2.var implies vt1 = vt2
+        }
+        fact ConstTermIsUnique {
+            all ct1, ct2: ConstTerm | ct1.constant = ct2.constant implies ct1 = ct2
+        }
 
         one sig Separator {
             root: one Formula
         }
 
-        // Generate concrete sorts
+        // --- Instance Specific Part ---
         one sig ${task.sorts.joinToString(", ") { "${it.name}Sort" }} extends Sort {}
-
-        // Generate variables
-        one sig ${(0 until 4).joinToString(", ") { "V$it" }} extends Variable {}
-
-        // Generate elements/constants
+        one sig ${(0 until numVariables).joinToString(", ") { "V$it" }} extends Variable {}
         ${generateElements(maxElements)}
-
-        // Define relations with type signatures
-        ${task.relations.joinToString("\n        ") { rel ->
-            """one sig ${rel.name}Rel extends Relation {} {
-                arity = ${rel.arity}
-                signature = ${rel.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
-            }"""
-        }}
-
-        // Define functions with type signatures
-        ${if (task.functions.isNotEmpty()) {
-            task.functions.joinToString("\n        ") { func ->
-                """one sig ${func.name}Func extends Function {} {
-                    arity = ${func.arity}
-                    signature = ${func.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
-                }"""
-            }
-        } else ""}
-
+        ${generateRelations()}
+        ${generateFunctions()}
         ${generateStructureConstraints()}
 
-        // Generate explicit environments
-         ${generateEnvironments(maxElements, numEnvironments)}
+        $generatedEnvs
 
         ${task.customConstraints}
 
@@ -378,37 +290,53 @@ class FOLLearner(
             all n: NegativeStructure | (EmptyEnvironment -> Separator.root) not in n.satisfies
         }
 
-        run runseparator {
-            findSeparator
-            }   for ${task.maxNumOfNode}  Formula, ${task.maxNumOfNode} Atom, ${task.maxNumOfNode} Quantifier, 
-        4 Variable, ${task.positiveExamples.size + task.negativeExamples.size + 2} Structure, ${task.maxNumOfNode} Term, 
-        ${task.maxNumOfNode} Tuple, ${numEnvironments } Environment, 
+        run { findSeparator } for $scope Formula, $scope Atom, ${task.maxQuantifiers} Quantifier,
+        $numVariables Variable, ${task.positiveExamples.size + task.negativeExamples.size} Structure, $scope Term,
+        $scope Tuple, ${envCount + 1} Environment,
         ${if (task.functions.isNotEmpty()) task.functions.size else "3"} Function
     """.trimIndent()
-
 
         return alloyScript
     }
 
     private fun generateElements(maxElements: Int): String {
         return (0 until maxElements).joinToString("\n        ") { index ->
-            val sort = task.sorts.firstOrNull()?.name ?: "Person"
+            val sort = task.sorts.firstOrNull()?.name ?: "DefaultSort"
             "one sig E$index extends Element {} { sort = ${sort}Sort }"
         }
     }
+
+    private fun generateRelations(): String {
+        return task.relations.joinToString("\n        ") { rel ->
+            """one sig ${rel.name}Rel extends Relation {} {
+                arity = ${rel.arity}
+                signature = ${rel.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
+            }"""
+        }
+    }
+
+    private fun generateFunctions(): String {
+        return if (task.functions.isNotEmpty()) {
+            task.functions.joinToString("\n        ") { func ->
+                """one sig ${func.name}Func extends Function {} {
+                    arity = ${func.arity}
+                    signature = ${func.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
+                }"""
+            }
+        } else ""
+    }
+
 
     private fun generateStructureConstraints(): String {
         val structures = mutableListOf<String>()
         val facts = mutableListOf<String>()
 
-        // Generate positive structures
         task.positiveExamples.forEachIndexed { index, example ->
             val structName = "PS$index"
             structures.add(generateSimpleStructure(structName, "PositiveStructure", example))
             facts.add(generateStructureFact(structName, example))
         }
 
-        // Generate negative structures
         task.negativeExamples.forEachIndexed { index, example ->
             val structName = "NS$index"
             structures.add(generateSimpleStructure(structName, "NegativeStructure", example))
@@ -429,7 +357,6 @@ class FOLLearner(
         val elementMapping = example.structure.constants.mapIndexed { i, const -> const.name to "E$i" }.toMap()
         val constraints = mutableListOf<String>()
 
-        // Generate relation constraints
         task.relations.forEach { rel ->
             val facts = example.structure.relationFacts[rel.name] ?: emptyList()
             if (facts.isNotEmpty()) {
@@ -445,7 +372,6 @@ class FOLLearner(
             }
         }
 
-        // Generate function constraints
         constraints.add("no $name.func_interpretation")
 
         return """fact ${name}Constraints {
@@ -453,39 +379,38 @@ class FOLLearner(
         }"""
     }
 
-    private fun generateEnvironments(maxElements: Int, numEnvironments: Int): String {
-        val environmentDefs = mutableListOf<String>()
+    private fun generateAllEnvironments(numVars: Int, maxElements: Int): Pair<String, Int> {
+        if (numVars == 0) return Pair("", 0)
 
-        var envIndex = 1
+        val variables = (0 until numVars).map { "V$it" }
+        val elements = (0 until maxElements).map { "E$it" }
+        val elementChoices = elements + listOf<String?>(null)
 
-        for (v in 0 until minOf(4, numEnvironments / maxElements)) {
-            for (e in 0 until maxElements) {
-                if (envIndex <= numEnvironments) {
-                    environmentDefs.add("one sig Env$envIndex extends Environment {} { mapping = V$v->E$e }")
-                    envIndex++
+        var allMappings = listOf(mapOf<String, String?>())
+
+        // Generate all possible mappings by computing the Cartesian product
+        for (variable in variables) {
+            val nextMappings = mutableListOf<Map<String, String?>>()
+            for (mapping in allMappings) {
+                for (choice in elementChoices) {
+                    nextMappings.add(mapping + (variable to choice))
                 }
             }
+            allMappings = nextMappings
         }
 
-        if (maxElements >= 2 && envIndex <= numEnvironments) {
-            for (e1 in 0 until minOf(maxElements, 3)) {
-                for (e2 in 0 until minOf(maxElements, 3)) {
-                    if (envIndex <= numEnvironments) {
-                        environmentDefs.add("one sig Env$envIndex extends Environment {} { mapping = V0->E$e1 + V1->E$e2 }")
-                        envIndex++
-                    }
-                }
-            }
+        val finalMappings = allMappings.filter { it.values.any { v -> v != null } }
+
+        val environmentDefs = finalMappings.mapIndexed { index, mapping ->
+            val mappingStr = mapping.entries
+                .filter { it.value != null }
+                .joinToString(" + ") { (v, e) -> "$v->$e" }
+            "one sig Env${index + 1} extends Environment {} { mapping = $mappingStr }"
         }
 
-        return """
-        ${environmentDefs.joinToString("\n        ")}
-
-        fact AllEnvironments {
-            no EmptyEnvironment.mapping
-        }
-    """.trimIndent()
+        return Pair(environmentDefs.joinToString("\n        "), finalMappings.size)
     }
+
 
     fun learn(start: Int? = null, stepSize: Int = 2): FOLLearningSolution? {
         val startNum = start ?: min(max((task.maxNumOfNode - task.sorts.size) / 2, 3), 6)
@@ -493,14 +418,12 @@ class FOLLearner(
         if (nodesSeq.isEmpty() || nodesSeq.last() < task.maxNumOfNode)
             nodesSeq.add(task.maxNumOfNode)
 
-        val alloyTemplate = generateAlloyModel()
-
-        println("=== GENERATED ALLOY CODE ===")
-        println(alloyTemplate)
-        println("=== END ALLOY CODE ===")
-
         for (n in nodesSeq) {
-            val alloyScript = String.format(alloyTemplate, n)
+            val alloyScript = generateAlloyModel(n)
+
+            println("=== GENERATED ALLOY CODE (Scope: $n) ===")
+            println(alloyScript)
+            println("=== END ALLOY CODE ===")
 
             val reporter = A4Reporter.NOP
             val world = CompUtil.parseEverything_fromString(reporter, alloyScript)
@@ -509,6 +432,7 @@ class FOLLearner(
             val solution = TranslateAlloyToKodkod.execute_command(reporter, world.allReachableSigs, command, options)
 
             if (solution.satisfiable()) {
+                println("Found a satisfying solution with scope $n.")
                 return FOLLearningSolution(this, world, solution, n, stepSize)
             }
         }

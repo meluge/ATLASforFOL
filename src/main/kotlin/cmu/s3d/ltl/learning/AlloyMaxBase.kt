@@ -19,6 +19,7 @@ open class AlloyMaxBase(private val customAlloyOptions: A4Options?) {
                 skolemDepth = 1
                 noOverflow = false
                 inferPartialInstance = true
+                symmetry = 20
             }
         }
     }
