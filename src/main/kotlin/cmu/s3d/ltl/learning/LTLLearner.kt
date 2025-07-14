@@ -16,18 +16,12 @@ data class FOLTask(
     val functions: List<FOLFunction>,
     val positiveExamples: List<FOLExample>,
     val negativeExamples: List<FOLExample>,
-    val maxNumOfNode: Int = 10,
-    val maxQuantifiers: Int = 3,
+    val maxNumOfNode: Int = 4,
+    val maxQuantifiers: Int = 3, // New: Limit the number of quantifiers
     val excludedOperators: List<String> = emptyList(),
-    val customConstraints: String = """
-        fact OnlyVarTerms {
-            all a: Atom | a in Separator.root.*all_children implies {
-                all t: a.terms[Idx] | t in VarTerm
-            }
-        }
-    """
-)
+    val customConstraints: String = ""
 
+)
 
 
 class FOLLearner(
@@ -48,6 +42,7 @@ class FOLLearner(
             task.functions.maxOfOrNull { it.arity } ?: 2
         )
 
+        // The number of variables is now tied to the max number of quantifiers.
         val numVariables = task.maxQuantifiers
         val (generatedEnvs, envCount) = generateAllEnvironments(numVariables, maxElements)
 
@@ -173,11 +168,6 @@ class FOLLearner(
         abstract sig PositiveStructure extends Structure {}
         abstract sig NegativeStructure extends Structure {}
 
-        fun all_children : Formula -> Formula {
-            (Quantifier <: body) + (UnaryConnective <: child) +
-            (BinaryConnective <: (left + right))
-        }
-
         fun extendEnv[env: Environment, v: Variable, e: Element]: Environment {
             {eEnv: Environment | eEnv.mapping = env.mapping ++ (v -> e)}
         }
@@ -224,38 +214,38 @@ class FOLLearner(
             }
         }
 
-        fact FormulaStructure {
-            all f: Formula - Separator.root | one f.~all_children
-            Formula = Separator.root.*all_children
-            no f: Formula | f in f.^all_children
-        }
+        fact StructureAndWellFormedness {
+            let all_children = (Quantifier <: body) + (UnaryConnective <: child) + (BinaryConnective <: (left + right)) | {
+                // FormulaStructure constraints
+                all f: Formula - Separator.root | one f.~all_children
+                Formula = Separator.root.*all_children
+                no f: Formula | f in f.^all_children
 
-        fact WellFormedness {
-            all f: Formula | some a: Atom | a in f.*all_children
-            all a: Atom, vt: getTerms[a] & VarTerm |
-                some q: Quantifier | q.bound_var = vt.var and a in q.^all_children
-            all q: Quantifier |
-                some a: Atom, vt: getTerms[a] & VarTerm |
-                    vt.var = q.bound_var and a in q.^all_children
-            all q1, q2: Quantifier |
-                q2 in q1.^all_children implies q1.bound_var != q2.bound_var
-            all a: Atom | #a.terms = a.relation.arity
+                // WellFormedness constraints
+                all f: Formula | some a: Atom | a in f.*all_children
+                all a: Atom, vt: getTerms[a] & VarTerm |
+                    some q: Quantifier | q.bound_var = vt.var and a in q.^all_children
+                all q: Quantifier |
+                    some a: Atom, vt: getTerms[a] & VarTerm |
+                        vt.var = q.bound_var and a in q.^all_children
+                all q1, q2: Quantifier |
+                    q2 in q1.^all_children implies q1.bound_var != q2.bound_var
+                all a: Atom | #a.terms = a.relation.arity
+                
+                 all c: And + Or + Implies + Not | no (c.*all_children & Quantifier)  all c: And + Or + Implies + Not | no (c.*all_children & Quantifier)
+                  
+                   all a: Atom | a in Separator.root.*all_children implies {
+                all t: a.terms[Idx] | t in VarTerm
+            } }
         }
         
         fact QuantifierLimit {
              #Quantifier <= ${task.maxQuantifiers}
         }
 
-        fact SyntacticRestrictions {
-            all c: And + Or + Implies + Not | no (c.*all_children & Quantifier)
-        }
-
         fact AvoidDegenerateFormulas {
-            // Prevent double negation
             no n: Not | n.child in Not
-            // Prevent trivial conjunctions/disjunctions like (p and p)
             no bc: BinaryConnective | bc.left = bc.right
-            // Prevent redundant atoms
             no disj a1, a2: Atom | a1.relation = a2.relation and a1.terms = a2.terms
         }
 
@@ -290,10 +280,7 @@ class FOLLearner(
             all n: NegativeStructure | (EmptyEnvironment -> Separator.root) not in n.satisfies
         }
 
-        run { findSeparator } for $scope Formula, $scope Atom, ${task.maxQuantifiers} Quantifier,
-        $numVariables Variable, ${task.positiveExamples.size + task.negativeExamples.size} Structure, $scope Term,
-        $scope Tuple, ${envCount + 1} Environment,
-        ${if (task.functions.isNotEmpty()) task.functions.size else "3"} Function
+        run { findSeparator } for 9
     """.trimIndent()
 
         return alloyScript
@@ -384,31 +371,38 @@ class FOLLearner(
 
         val variables = (0 until numVars).map { "V$it" }
         val elements = (0 until maxElements).map { "E$it" }
-        val elementChoices = elements + listOf<String?>(null)
 
-        var allMappings = listOf(mapOf<String, String?>())
+        val environments = mutableSetOf<Map<String, String>>()
 
-        // Generate all possible mappings by computing the Cartesian product
-        for (variable in variables) {
-            val nextMappings = mutableListOf<Map<String, String?>>()
-            for (mapping in allMappings) {
-                for (choice in elementChoices) {
-                    nextMappings.add(mapping + (variable to choice))
+
+        fun generatePrefixEnvironments(numVarsToBind: Int): Set<Map<String, String>> {
+            if (numVarsToBind == 0) return setOf(emptyMap())
+
+            val prefixEnvs = mutableSetOf<Map<String, String>>()
+            val prevEnvs = generatePrefixEnvironments(numVarsToBind - 1)
+
+            for (env in prevEnvs) {
+                for (elem in elements) {
+                    prefixEnvs.add(env + (variables[numVarsToBind - 1] to elem))
                 }
             }
-            allMappings = nextMappings
+
+            return prefixEnvs
         }
 
-        val finalMappings = allMappings.filter { it.values.any { v -> v != null } }
+        for (k in 1..numVars) {
+            environments.addAll(generatePrefixEnvironments(k))
+        }
 
-        val environmentDefs = finalMappings.mapIndexed { index, mapping ->
+
+        val environmentDefs = environments.toList().sortedBy { it.size }.mapIndexed { index, mapping ->
             val mappingStr = mapping.entries
-                .filter { it.value != null }
+                .sortedBy { it.key }
                 .joinToString(" + ") { (v, e) -> "$v->$e" }
             "one sig Env${index + 1} extends Environment {} { mapping = $mappingStr }"
         }
 
-        return Pair(environmentDefs.joinToString("\n        "), finalMappings.size)
+        return Pair(environmentDefs.joinToString("\n        "), environments.size)
     }
 
 

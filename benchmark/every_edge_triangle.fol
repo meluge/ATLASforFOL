@@ -17,6 +17,8 @@
 
 
 
+
+
 (model -
    ((e0 Node) (e1 Node) (e2 Node))
    (edge e0 e1)
@@ -24,3 +26,4 @@
    (edge e2 e1)
    (edge e1 e2)
 )
+

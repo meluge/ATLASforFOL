@@ -69,7 +69,7 @@ class CLI : CliktCommand(
 
         val learner = task.buildLearner(options, !findAny)
         if (model) {
-            println(learner.generateAlloyModel(8).trimIndent())
+            println(learner.generateAlloyModel(9).trimIndent())
             return  // Exit early if just printing model
         }
 

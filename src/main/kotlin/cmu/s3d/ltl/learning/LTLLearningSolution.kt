@@ -355,7 +355,7 @@ class FOLLearningSolution(
         return if (nextSolution.satisfiable()) {
             FOLLearningSolution(learner, world, nextSolution, numOfNode, stepSize)
         } else {
-            learner.learn(numOfNode + stepSize)
+            learner.learn()
         }
     }
 
