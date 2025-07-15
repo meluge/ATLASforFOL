@@ -61,6 +61,24 @@ object FOLTaskParser {
         }
     }
 
+    private fun convertFunctionExample(example: FOLExample): FOLExample {
+        val newRelationFacts = example.structure.relationFacts.toMutableMap()
+
+        // Convert function facts to relation facts
+        example.structure.functionFacts.forEach { (funcName, facts) ->
+            newRelationFacts[funcName] = facts
+        }
+
+        return FOLExample(
+            structure = FOLStructure(
+                constants = example.structure.constants,
+                relationFacts = newRelationFacts,
+                functionFacts = emptyMap() // Clear function facts
+            ),
+            isPositive = example.isPositive
+        )
+    }
+
     private fun parseJsonFormat(jsonString: String): FOLTask {
         val jsonTask = Json.decodeFromString<JsonFOLTask>(jsonString)
 
@@ -152,12 +170,21 @@ object FOLTaskParser {
             }
         }
 
+        val allRelations = relations.toMutableList()
+        functions.forEach { func ->
+            allRelations.add(FOLRelation(func.name, func.signature))
+        }
+
+        // Convert function facts in examples
+        val convertedPositiveExamples = positiveExamples.map { convertFunctionExample(it) }
+        val convertedNegativeExamples = negativeExamples.map { convertFunctionExample(it) }
+
         return FOLTask(
             sorts = sorts,
-            relations = relations,
-            functions = functions,
-            positiveExamples = positiveExamples,
-            negativeExamples = negativeExamples,
+            relations = allRelations, // Include converted functions
+            functions = functions, // Keep original for output formatting
+            positiveExamples = convertedPositiveExamples,
+            negativeExamples = convertedNegativeExamples,
             maxNumOfNode = 8
         )
     }

@@ -79,12 +79,15 @@ class SampleReducer(
         functionFacts: Map<String, List<List<String>>>,
         constantMapping: Map<String, String>
     ): Map<String, List<List<String>>> {
+        // Since we're converting functions to relations, this should handle empty maps
+        if (functionFacts.isEmpty()) return emptyMap()
+
         return functionFacts.mapValues { (_, facts) ->
             facts.map { fact ->
                 fact.map { constantName ->
                     constantMapping[constantName] ?: constantName
                 }
-            }.distinct() // Remove duplicate facts
+            }.distinct()
         }
     }
 

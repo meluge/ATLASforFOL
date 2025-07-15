@@ -78,8 +78,7 @@ class FOLLearner(
             some s: Symbol | #tup = s.arity
         }
 
-        abstract sig Relation extends Symbol {}
-        abstract sig Function extends Symbol {} {
+        abstract sig Relation extends Symbol {} {
             arity > 1
         }
 
@@ -102,24 +101,8 @@ class FOLLearner(
                 eval[s][env] = (constant & s.elements)
         }
 
-        sig FuncTerm extends Term {
-            func: one Function,
-            args: Idx -> lone Term
-        } {
-            #args = func.arity.minus[1]
-            all i: Idx | some args[i] iff #(i.prevs + i) < func.arity
-        }
-
-        fact FuncTermEvaluation {
-            all s: Structure, ft: FuncTerm, env: Environment |
-                ft.eval[s][env] = {e: Element |
-                    some tuple: s.func_interpretation[ft.func] |
-                        (all i: Idx | some ft_arg: ft.args[i] |
-                            tuple.tup[i] in ft_arg.eval[s][env]) and
-                        tuple.tup[last[ft.func.arity]] = e
-                }
-        }
-
+      
+  
         sig Atom extends Formula {
             relation: one Relation,
             terms: Idx -> lone Term
@@ -161,7 +144,6 @@ class FOLLearner(
         abstract sig Structure {
             elements: set Element,
             interpretation: Relation -> set Tuple,
-            func_interpretation: Function -> set Tuple,
             satisfies: Environment -> set Formula
         }
 
@@ -303,14 +285,7 @@ class FOLLearner(
     }
 
     private fun generateFunctions(): String {
-        return if (task.functions.isNotEmpty()) {
-            task.functions.joinToString("\n        ") { func ->
-                """one sig ${func.name}Func extends Function {} {
-                    arity = ${func.arity}
-                    signature = ${func.signature.mapIndexed { i, sort -> "I$i->${sort}Sort" }.joinToString(" + ")}
-                }"""
-            }
-        } else ""
+        return "" // No functions in Alloy model anymore
     }
 
 
@@ -359,7 +334,6 @@ class FOLLearner(
             }
         }
 
-        constraints.add("no $name.func_interpretation")
 
         return """fact ${name}Constraints {
             ${constraints.joinToString("\n            ")}
@@ -427,7 +401,7 @@ class FOLLearner(
 
             if (solution.satisfiable()) {
                 println("Found a satisfying solution with scope $n.")
-                return FOLLearningSolution(this, world, solution, n, stepSize)
+                return FOLLearningSolution(this, world, solution, n, stepSize, task)
             }
         }
 

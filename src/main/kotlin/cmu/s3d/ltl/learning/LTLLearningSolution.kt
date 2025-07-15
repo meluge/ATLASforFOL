@@ -12,7 +12,8 @@ class FOLLearningSolution(
     private val world: CompModule,
     private val alloySolution: A4Solution,
     private val numOfNode: Int,
-    private val stepSize: Int
+    private val stepSize: Int,
+    private val originalTask: FOLTask // Add this parameter
 ) {
 
     fun dumpInstance(tag: String = "") {
@@ -186,10 +187,26 @@ class FOLLearningSolution(
                 currentIdxAtom = nextMap[currentIdxAtom]?.toString()
             }
 
-            return if (termsList.isNotEmpty()) {
-                "$cleanRelation(${termsList.joinToString(",")})"
+            val originalFunction = originalTask.functions.find { it.name == cleanRelation }
+
+            return if (originalFunction != null && termsList.isNotEmpty()) {
+                // Format as function equality: f(args) = result
+                val inputArgs = termsList.dropLast(1) // All but last argument
+                val outputArg = termsList.last() // Last argument is the result
+
+                if (inputArgs.isNotEmpty()) {
+                    "${cleanRelation}(${inputArgs.joinToString(",")}) = ${outputArg}"
+                } else {
+                    // Zero-arity function (constant)
+                    "${cleanRelation} = ${outputArg}"
+                }
             } else {
-                cleanRelation
+                // Regular relation formatting
+                if (termsList.isNotEmpty()) {
+                    "$cleanRelation(${termsList.joinToString(",")})"
+                } else {
+                    cleanRelation
+                }
             }
 
         } catch (e: Exception) {
@@ -261,39 +278,39 @@ class FOLLearningSolution(
             }
 
             // func case
-            try {
-                val funcExpr = CompUtil.parseOneExpression_fromString(world, "$term.func")
-                val funcResult = alloySolution.eval(funcExpr) as A4TupleSet
-                if (funcResult.size() > 0) {
-                    val function = funcResult.map { it.atom(0) }.firstOrNull()
-                    println("      Function found: $function")
-                    if (function != null) {
-                        val argsList = mutableListOf<String>()
-                        var i = 0
-                        while (true) {
-                            try {
-                                val argExpr = CompUtil.parseOneExpression_fromString(world, "$term.args[I$i]")
-                                val argResult = alloySolution.eval(argExpr) as A4TupleSet
-                                val arg = argResult.map { it.atom(0) }.firstOrNull()
-                                if (arg != null) {
-                                    argsList.add(buildTermString(arg))
-                                    i++
-                                } else {
-                                    break
-                                }
-                            } catch (e: Exception) {
-                                break
-                            }
-                        }
-                        val cleanFunc = function.replace("Func", "").replace("⁰", "").replace("\\$\\d+".toRegex(), "")
-                        val result = "$cleanFunc(${argsList.joinToString(",")})"
-                        println("      Function result: $result")
-                        return result
-                    }
-                }
-            } catch (e: Exception) {
-                println("      Not a function term: ${e.message}")
-            }
+//            try {
+//                val funcExpr = CompUtil.parseOneExpression_fromString(world, "$term.func")
+//                val funcResult = alloySolution.eval(funcExpr) as A4TupleSet
+//                if (funcResult.size() > 0) {
+//                    val function = funcResult.map { it.atom(0) }.firstOrNull()
+//                    println("      Function found: $function")
+//                    if (function != null) {
+//                        val argsList = mutableListOf<String>()
+//                        var i = 0
+//                        while (true) {
+//                            try {
+//                                val argExpr = CompUtil.parseOneExpression_fromString(world, "$term.args[I$i]")
+//                                val argResult = alloySolution.eval(argExpr) as A4TupleSet
+//                                val arg = argResult.map { it.atom(0) }.firstOrNull()
+//                                if (arg != null) {
+//                                    argsList.add(buildTermString(arg))
+//                                    i++
+//                                } else {
+//                                    break
+//                                }
+//                            } catch (e: Exception) {
+//                                break
+//                            }
+//                        }
+//                        val cleanFunc = function.replace("Func", "").replace("⁰", "").replace("\\$\\d+".toRegex(), "")
+//                        val result = "$cleanFunc(${argsList.joinToString(",")})"
+//                        println("      Function result: $result")
+//                        return result
+//                    }
+//                }
+//            } catch (e: Exception) {
+//                println("      Not a function term: ${e.message}")
+//            }
 
             val fallback = term.replace("⁰", "").replace("\\$\\d+".toRegex(), "")
             println("      Fallback result: $fallback")
@@ -353,7 +370,7 @@ class FOLLearningSolution(
     fun next(): FOLLearningSolution? {
         val nextSolution = alloySolution.next()
         return if (nextSolution.satisfiable()) {
-            FOLLearningSolution(learner, world, nextSolution, numOfNode, stepSize)
+            FOLLearningSolution(learner, world, nextSolution, numOfNode, stepSize, originalTask)
         } else {
             learner.learn()
         }
