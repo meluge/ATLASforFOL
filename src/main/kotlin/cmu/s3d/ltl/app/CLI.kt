@@ -79,7 +79,11 @@ class CLI : CliktCommand(
             return  // Exit early if just printing model
         }
 
-        val executor = Executors.newSingleThreadExecutor()
+        // Daemon thread so the JVM can exit on timeout even if the native SAT solve,
+        // which does not respond to interrupts, is still running.
+        val executor = Executors.newSingleThreadExecutor { r ->
+            Thread(r).apply { isDaemon = true }
+        }
         val future = executor.submit {
             val startTime = System.currentTimeMillis()
             println("Starting learning process...")
@@ -87,10 +91,11 @@ class CLI : CliktCommand(
             val solvingTime = (System.currentTimeMillis() - startTime).toDouble() / 1000
 
             if (solution != null) {
-                println(solution.debugFormulaStructure())
                 println("Solution found!")
                 val formula = solution.getFOL2()
                 println("Formula: $formula")
+                // Independently re-check (no solver) that the formula truly separates.
+                println(solution.verifySeparation(task).report())
                 println("$pathName,${task.toCSVString()},$solvingTime,\"$formula\"")
             } else {
                 println("No solution found (UNSAT)")
@@ -98,6 +103,20 @@ class CLI : CliktCommand(
             }
         }
 
+        // Enforce the --timeout: without this the future was never awaited and the
+        // executor never shut down, so the timeout option did nothing.
+        try {
+            if (timeout > 0) future.get(timeout.toLong(), TimeUnit.SECONDS)
+            else future.get()
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            println("Timed out after ${timeout}s")
+            println("$pathName,${task.toCSVString()},$timeout,TIMEOUT")
+        } catch (e: Exception) {
+            println("Error during learning: ${e.message}")
+        } finally {
+            executor.shutdownNow()
+        }
     }
 }
 

@@ -367,6 +367,68 @@ class FOLLearningSolution(
         return (alloySolution.eval(expr) as A4TupleSet).map { it.atom(0) }.first()
     }
 
+    private fun clean(atom: String): String =
+        atom.replace("⁰", "").replace("\\$\\d+".toRegex(), "")
+
+    /** Raw variable key for a quantifier's bound variable (e.g. "Vnode0"), no lowercasing. */
+    private fun rawBoundVar(node: String): String {
+        val expr = CompUtil.parseOneExpression_fromString(world, "$node.bound_var")
+        return clean((alloySolution.eval(expr) as A4TupleSet).map { it.atom(0) }.first())
+    }
+
+    private fun rawVarSort(node: String): String {
+        val expr = CompUtil.parseOneExpression_fromString(world, "$node.var_sort")
+        val s = (alloySolution.eval(expr) as A4TupleSet).map { it.atom(0) }.first()
+        return clean(s).removeSuffix("Sort")
+    }
+
+    private fun rawRelation(node: String): String {
+        val expr = CompUtil.parseOneExpression_fromString(world, "$node.relation")
+        val r = (alloySolution.eval(expr) as A4TupleSet).map { it.atom(0) }.first()
+        return clean(r).removeSuffix("Rel")
+    }
+
+    /** Variable keys of an atom's terms, in Idx order. */
+    private fun rawTermVars(node: String): List<String> {
+        val ordSig = world.allReachableSigs.find { it.label == "this/IdxOrder/Ord" || it.label == "IdxOrder/Ord" }
+            ?: error("Could not find sig 'IdxOrder/Ord'")
+        val nextField = ordSig.fields.find { it.label == "Next" } ?: error("no Next")
+        val firstField = ordSig.fields.find { it.label == "First" } ?: error("no First")
+        val nextMap = (alloySolution.eval(nextField) as A4TupleSet).associate { it.atom(1) to it.atom(2) }
+        var cur = (alloySolution.eval(firstField) as A4TupleSet).firstOrNull()?.atom(1)?.toString()
+        val vars = mutableListOf<String>()
+        while (cur != null) {
+            val termExpr = CompUtil.parseOneExpression_fromString(world, "($node.terms)[$cur]")
+            val term = (alloySolution.eval(termExpr) as A4TupleSet).map { it.atom(0) }.firstOrNull() ?: break
+            val varExpr = CompUtil.parseOneExpression_fromString(world, "$term.var")
+            val v = (alloySolution.eval(varExpr) as A4TupleSet).map { it.atom(0) }.firstOrNull() ?: break
+            vars.add(clean(v))
+            cur = nextMap[cur]?.toString()
+        }
+        return vars
+    }
+
+    /** Build a native AST mirroring the synthesized formula (for independent checking). */
+    fun extractFormula(): Fml = build(getRoot())
+
+    private fun build(node: String): Fml {
+        val (name, left, right) = getNodeAndChildren(node)
+        return when (name.replace("\\d+$".toRegex(), "")) {
+            "Forall" -> QForall(rawBoundVar(node), rawVarSort(node), build(left!!))
+            "Exists" -> QExists(rawBoundVar(node), rawVarSort(node), build(left!!))
+            "Not" -> FNot(build(left!!))
+            "And" -> FAnd(build(left!!), build(right!!))
+            "Or" -> FOr(build(left!!), build(right!!))
+            "Implies" -> FImplies(build(left!!), build(right!!))
+            else -> if (isAtom(node)) FAtom(rawRelation(node), rawTermVars(node))
+                    else error("Unknown formula node: $name")
+        }
+    }
+
+    /** Re-check, natively, that the synthesized formula actually separates the examples. */
+    fun verifySeparation(task: FOLTask): SeparationChecker.Result =
+        SeparationChecker.check(extractFormula(), task)
+
     fun next(): FOLLearningSolution? {
         val nextSolution = alloySolution.next()
         return if (nextSolution.satisfiable()) {
