@@ -19,7 +19,7 @@ class CLI : CliktCommand(
     name = "FOL-Atlas",
     help = "A tool to learn FOL formulas from positive and negative examples using AlloyMax."
 ) {
-    private val solver by option("--solver", "-s", help = "The AlloyMax solver to use. Default: SAT4JMax").default("SAT4JMax")
+    private val solver by option("--solver", "-s", help = "SAT solver: GlucoseJNI (default), CryptoMiniSatJNI, MiniSatJNI, Glucose41JNI, LingelingJNI, SAT4J, SAT4JMax, OpenWBO. The model has no Max-SAT objective, so a fast native SAT solver is preferred.").default("GlucoseJNI")
     private val filename by option("--filename", "-f", help = "The file containing one task to run.")
     private val traces by option("--traces", "-t", help = "The folder containing the tasks to run. It will find all task files under the folder recursively.")
     private val timeout by option("--timeout", "-T", help = "The timeout in seconds for solving each task.").int().default(0)
@@ -55,7 +55,13 @@ class CLI : CliktCommand(
         val options = AlloyMaxBase.defaultAlloyOptions()
         options.solver = when (solver) {
             "SAT4JMax" -> A4Options.SatSolver.SAT4JMax
+            "SAT4J" -> A4Options.SatSolver.SAT4J
             "OpenWBO" -> A4Options.SatSolver.OpenWBO
+            "MiniSat", "MiniSatJNI" -> A4Options.SatSolver.MiniSatJNI
+            "Glucose", "GlucoseJNI" -> A4Options.SatSolver.GlucoseJNI
+            "Glucose41", "Glucose41JNI" -> A4Options.SatSolver.Glucose41JNI
+            "CryptoMiniSat", "CryptoMiniSatJNI" -> A4Options.SatSolver.CryptoMiniSatJNI
+            "Lingeling", "LingelingJNI" -> A4Options.SatSolver.LingelingJNI
             else -> A4Options.SatSolver.SAT4JMax
         }
 
@@ -69,7 +75,7 @@ class CLI : CliktCommand(
 
         val learner = task.buildLearner(options, !findAny)
         if (model) {
-            println(learner.generateAlloyModel(9).trimIndent())
+            println(learner.generateAlloyModel(task.maxNumOfNode).trimIndent())
             return  // Exit early if just printing model
         }
 
